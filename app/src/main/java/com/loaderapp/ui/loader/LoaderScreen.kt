@@ -481,7 +481,7 @@ fun OrderDetailBottomSheet(
     onDismiss: () -> Unit
 ) {
     val dateFormat = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
-    val sheetState = rememberModalBottomSheetState(skipPartialExpansion = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)) {
