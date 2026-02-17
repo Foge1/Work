@@ -1,8 +1,10 @@
 package com.loaderapp.data.repository
 
+import com.loaderapp.data.dao.ChatDao
 import com.loaderapp.data.dao.OrderDao
 import com.loaderapp.data.dao.OrderWorkerDao
 import com.loaderapp.data.dao.UserDao
+import com.loaderapp.data.model.ChatMessage
 import com.loaderapp.data.model.Order
 import com.loaderapp.data.model.OrderStatus
 import com.loaderapp.data.model.OrderWorker
@@ -13,7 +15,8 @@ import kotlinx.coroutines.flow.Flow
 class AppRepository(
     private val orderDao: OrderDao,
     private val userDao: UserDao,
-    private val orderWorkerDao: OrderWorkerDao
+    private val orderWorkerDao: OrderWorkerDao,
+    private val chatDao: ChatDao
 ) {
 
     // Order operations
@@ -80,4 +83,9 @@ class AppRepository(
     suspend fun updateUser(user: User) = userDao.updateUser(user)
     suspend fun deleteUser(user: User) = userDao.deleteUser(user)
     suspend fun updateUserRating(userId: Long, rating: Double) = userDao.updateUserRating(userId, rating)
+
+    // Chat operations
+    fun getMessagesForOrder(orderId: Long) = chatDao.getMessagesForOrder(orderId)
+    suspend fun sendMessage(message: ChatMessage): Long = chatDao.insertMessage(message)
+    fun getMessageCount(orderId: Long) = chatDao.getMessageCount(orderId)
 }

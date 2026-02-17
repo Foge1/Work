@@ -7,9 +7,14 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -24,13 +29,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.loaderapp.data.model.ChatMessage
 import com.loaderapp.data.model.Order
 import com.loaderapp.data.model.OrderStatus
 import com.loaderapp.data.model.User
+import com.loaderapp.data.model.UserRole
+import com.loaderapp.data.repository.AppRepository
 import com.loaderapp.ui.theme.GoldStar
 import com.loaderapp.ui.theme.StatusOrange
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -40,6 +50,8 @@ fun OrderDetailScreen(
     order: Order,
     dispatcher: User?,
     worker: User?,
+    currentUser: User?,
+    repository: AppRepository,
     onBack: () -> Unit,
     onTakeOrder: ((Order) -> Unit)? = null,
     onCompleteOrder: ((Order) -> Unit)? = null,
@@ -50,9 +62,22 @@ fun OrderDetailScreen(
     val context = LocalContext.current
     val dateFormat = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
+    // Chat state
+    val messages by repository.getMessagesForOrder(order.id).collectAsState(initial = emptyList())
+    var messageText by remember { mutableStateOf("") }
+    val chatListState = rememberLazyListState()
+    var chatExpanded by remember { mutableStateOf(false) }
+
+    // Auto-scroll to bottom on new messages
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty() && chatExpanded) {
+            chatListState.animateScrollToItem(messages.size - 1)
+        }
+    }
 
     // Staggered entrance animations
-    // Единый прогресс анимации — без coroutineScope/launch внутри LaunchedEffect
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         progress.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
@@ -75,6 +100,26 @@ fun OrderDetailScreen(
         OrderStatus.TAKEN, OrderStatus.IN_PROGRESS -> StatusOrange
         OrderStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
         OrderStatus.CANCELLED -> MaterialTheme.colorScheme.error
+    }
+
+    fun sendMessage() {
+        val text = messageText.trim()
+        if (text.isBlank() || currentUser == null) return
+        messageText = ""
+        scope.launch {
+            repository.sendMessage(
+                ChatMessage(
+                    orderId = order.id,
+                    senderId = currentUser.id,
+                    senderName = currentUser.name,
+                    senderRole = currentUser.role,
+                    text = text
+                )
+            )
+            if (messages.isNotEmpty()) {
+                chatListState.animateScrollToItem(messages.size)
+            }
+        }
     }
 
     Scaffold(
@@ -116,7 +161,6 @@ fun OrderDetailScreen(
                         .padding(horizontal = 20.dp, vertical = 20.dp)
                 ) {
                     Column {
-                        // Статус-бейдж
                         Surface(
                             color = accentColor.copy(alpha = 0.14f),
                             shape = RoundedCornerShape(8.dp)
@@ -151,7 +195,6 @@ fun OrderDetailScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Цена
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "${order.pricePerHour.toInt()} ₽/час",
@@ -169,7 +212,6 @@ fun OrderDetailScreen(
                             }
                         }
 
-                        // Прогресс грузчиков
                         if (order.requiredWorkers > 1) {
                             Spacer(modifier = Modifier.height(8.dp))
                             com.loaderapp.ui.loader.WorkerProgressBadge(
@@ -230,7 +272,7 @@ fun OrderDetailScreen(
                     }
                 }
 
-                // Оценка (если есть)
+                // Оценка
                 order.workerRating?.let { rating ->
                     Spacer(modifier = Modifier.height(16.dp))
                     DetailSection(title = "Оценка работы") {
@@ -288,6 +330,187 @@ fun OrderDetailScreen(
                     }
                 }
 
+                // ── ЧАТ ──────────────────────────────────────────────────
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Заголовок секции чата с кнопкой раскрытия
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    elevation = CardDefaults.cardElevation(0.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // Шапка чата — всегда видна
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Chat,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "ЧАТ",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 1.sp
+                            )
+                            if (messages.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "${messages.size}",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            IconButton(
+                                onClick = { chatExpanded = !chatExpanded },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    if (chatExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (chatExpanded) "Свернуть" else "Развернуть",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Содержимое чата (раскрывается)
+                        AnimatedVisibility(
+                            visible = chatExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(0.4f)
+                                )
+
+                                // Список сообщений
+                                if (messages.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Icon(
+                                                Icons.Default.ChatBubbleOutline,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f),
+                                                modifier = Modifier.size(32.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                "Сообщений пока нет",
+                                                fontSize = 13.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f)
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    LazyColumn(
+                                        state = chatListState,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 300.dp),
+                                        contentPadding = PaddingValues(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(messages, key = { it.id }) { msg ->
+                                            val isOwn = msg.senderId == currentUser?.id
+                                            ChatBubble(
+                                                message = msg,
+                                                isOwn = isOwn,
+                                                accentColor = if (msg.senderRole == UserRole.DISPATCHER)
+                                                    MaterialTheme.colorScheme.primary
+                                                else StatusOrange
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Поле ввода
+                                if (currentUser != null) {
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(0.4f)
+                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = messageText,
+                                            onValueChange = { messageText = it },
+                                            modifier = Modifier.weight(1f),
+                                            placeholder = {
+                                                Text(
+                                                    "Сообщение...",
+                                                    fontSize = 14.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f)
+                                                )
+                                            },
+                                            maxLines = 3,
+                                            shape = RoundedCornerShape(12.dp),
+                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                            keyboardActions = KeyboardActions(onSend = { sendMessage() }),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                                            )
+                                        )
+                                        IconButton(
+                                            onClick = { sendMessage() },
+                                            enabled = messageText.isNotBlank(),
+                                            modifier = Modifier
+                                                .size(44.dp)
+                                                .background(
+                                                    if (messageText.isNotBlank())
+                                                        MaterialTheme.colorScheme.primary
+                                                    else
+                                                        MaterialTheme.colorScheme.surfaceVariant,
+                                                    shape = CircleShape
+                                                )
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Send,
+                                                contentDescription = "Отправить",
+                                                tint = if (messageText.isNotBlank())
+                                                    MaterialTheme.colorScheme.onPrimary
+                                                else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(0.4f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // ── КОНЕЦ ЧАТА ───────────────────────────────────────────
+
                 // Кнопки действий
                 Column(
                     modifier = Modifier
@@ -297,7 +520,6 @@ fun OrderDetailScreen(
                         .offset(y = actionsOffsetVal.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Грузчик: взять заказ
                     if (!isDispatcher && order.status == OrderStatus.AVAILABLE && onTakeOrder != null) {
                         Button(
                             onClick = { onTakeOrder(order) },
@@ -310,7 +532,6 @@ fun OrderDetailScreen(
                         }
                     }
 
-                    // Грузчик: завершить заказ
                     if (!isDispatcher && order.status == OrderStatus.TAKEN && onCompleteOrder != null) {
                         Button(
                             onClick = { onCompleteOrder(order) },
@@ -326,7 +547,6 @@ fun OrderDetailScreen(
                         }
                     }
 
-                    // Диспетчер: отменить заказ
                     if (isDispatcher && order.status == OrderStatus.AVAILABLE && onCancelOrder != null) {
                         OutlinedButton(
                             onClick = { onCancelOrder(order) },
@@ -347,6 +567,82 @@ fun OrderDetailScreen(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatBubble(
+    message: ChatMessage,
+    isOwn: Boolean,
+    accentColor: Color
+) {
+    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale("ru")) }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (isOwn) Alignment.End else Alignment.Start
+    ) {
+        // Имя отправителя (только для чужих)
+        if (!isOwn) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = accentColor.copy(alpha = 0.15f),
+                    modifier = Modifier.size(18.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            message.senderName.take(1).uppercase(),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor
+                        )
+                    }
+                }
+                Text(
+                    text = message.senderName,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accentColor
+                )
+            }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(
+                topStart = if (isOwn) 14.dp else 4.dp,
+                topEnd = if (isOwn) 4.dp else 14.dp,
+                bottomStart = 14.dp,
+                bottomEnd = 14.dp
+            ),
+            color = if (isOwn)
+                accentColor.copy(alpha = 0.85f)
+            else
+                MaterialTheme.colorScheme.surface,
+            shadowElevation = 1.dp
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(
+                    text = message.text,
+                    fontSize = 14.sp,
+                    color = if (isOwn) Color.White else MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = timeFormat.format(Date(message.sentAt)),
+                    fontSize = 10.sp,
+                    color = if (isOwn)
+                        Color.White.copy(alpha = 0.7f)
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f),
+                    modifier = Modifier.align(Alignment.End)
+                )
             }
         }
     }
@@ -456,11 +752,7 @@ private fun ContactRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = name,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
-                )
+                Text(text = name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = color.copy(alpha = 0.12f)
@@ -483,39 +775,25 @@ private fun ContactRow(
                 )
             }
         }
-
-        // Кнопки звонка и SMS
         if (phone.isNotBlank()) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(
                     onClick = {
-                        context.startActivity(
-                            Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                        )
+                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
                     },
                     modifier = Modifier.size(40.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Phone,
-                        contentDescription = "Позвонить",
-                        tint = color,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Icon(Icons.Default.Phone, "Позвонить", tint = color, modifier = Modifier.size(20.dp))
                 }
                 IconButton(
                     onClick = {
-                        context.startActivity(
-                            Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone"))
-                        )
+                        context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone")))
                     },
                     modifier = Modifier.size(40.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Message,
-                        contentDescription = "SMS",
+                    Icon(Icons.Default.Message, "SMS",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
+                        modifier = Modifier.size(20.dp))
                 }
             }
         }

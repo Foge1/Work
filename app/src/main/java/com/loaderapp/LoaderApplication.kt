@@ -22,7 +22,8 @@ class LoaderApplication : Application() {
         repository = AppRepository(
             orderDao = database.orderDao(),
             userDao = database.userDao(),
-            orderWorkerDao = database.orderWorkerDao()
+            orderWorkerDao = database.orderWorkerDao(),
+            chatDao = database.chatDao()
         )
         userPreferences = UserPreferences(this)
     }

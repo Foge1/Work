@@ -30,7 +30,7 @@ fun CreateOrderDialog(
     var estimatedHours by remember { mutableStateOf("1") }
     var comment by remember { mutableStateOf("") }
     var requiredWorkers by remember { mutableIntStateOf(1) }
-    var minWorkerRating by remember { mutableFloatStateOf(0f) }
+    var minWorkerRating by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
 
     val calendar = Calendar.getInstance()
@@ -41,9 +41,6 @@ fun CreateOrderDialog(
     var showTimePicker by remember { mutableStateOf(false) }
 
     val dateFormat = SimpleDateFormat("dd MMMM yyyy", Locale("ru"))
-
-    // Варианты минимального рейтинга
-    val ratingOptions = listOf(0f to "Любой", 3f to "3.0+", 3.5f to "3.5+", 4f to "4.0+", 4.5f to "4.5+")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -155,22 +152,34 @@ fun CreateOrderDialog(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Row(
+                OutlinedTextField(
+                    value = minWorkerRating,
+                    onValueChange = { input ->
+                        // Пропускаем только цифры, точку и запятую; не даём ввести > 5
+                        val filtered = input.replace(',', '.').filter { it.isDigit() || it == '.' }
+                        val num = filtered.toFloatOrNull()
+                        if (filtered.isEmpty() || (num != null && num <= 5f) || filtered == ".")
+                            minWorkerRating = filtered
+                    },
+                    label = { Text("От 0 до 5 (необязательно)") },
+                    leadingIcon = { Icon(Icons.Default.Star, null, modifier = Modifier.size(18.dp)) },
+                    trailingIcon = {
+                        if (minWorkerRating.isNotEmpty()) {
+                            IconButton(onClick = { minWorkerRating = "" }) {
+                                Icon(Icons.Default.Clear, null, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    ratingOptions.forEach { (rating, label) ->
-                        val selected = minWorkerRating == rating
-                        FilterChip(
-                            selected = selected,
-                            onClick = { minWorkerRating = rating },
-                            label = { Text(label, fontSize = 12.sp) },
-                            leadingIcon = if (rating > 0) {
-                                { Icon(Icons.Default.Star, null, modifier = Modifier.size(14.dp)) }
-                            } else null
-                        )
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    supportingText = {
+                        val v = minWorkerRating.toFloatOrNull()
+                        if (minWorkerRating.isNotEmpty() && (v == null || v < 0 || v > 5)) {
+                            Text("Введите число от 0 до 5", color = MaterialTheme.colorScheme.error)
+                        }
                     }
-                }
+                )
 
                 OutlinedTextField(
                     value = comment,
@@ -201,8 +210,9 @@ fun CreateOrderDialog(
                         cal.set(Calendar.SECOND, 0)
                         val priceValue = price.toDoubleOrNull() ?: 0.0
                         val hoursValue = estimatedHours.toIntOrNull() ?: 1
+                        val ratingValue = minWorkerRating.toFloatOrNull()?.coerceIn(0f, 5f) ?: 0f
                         if (priceValue > 0 && hoursValue > 0) {
-                            onCreate(address, cal.timeInMillis, cargo, priceValue, hoursValue, comment, requiredWorkers, minWorkerRating)
+                            onCreate(address, cal.timeInMillis, cargo, priceValue, hoursValue, comment, requiredWorkers, ratingValue)
                         } else showError = true
                     } catch (e: Exception) { showError = true }
                 } else showError = true

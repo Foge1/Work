@@ -204,6 +204,8 @@ fun MainScreen() {
                         order = s.order,
                         dispatcher = s.dispatcher,
                         worker = s.worker,
+                        currentUser = currentUser,
+                        repository = app.repository,
                         isDispatcher = s.isDispatcher,
                         workerCount = s.workerCount,
                         onBack = { screen = if (currentUser?.role == UserRole.DISPATCHER) AppScreen.Dispatcher(currentUser!!) else AppScreen.Loader(currentUser!!) },
