@@ -24,27 +24,49 @@ import androidx.compose.ui.unit.sp
 import com.loaderapp.ui.theme.SplashEnd
 import com.loaderapp.ui.theme.SplashStart
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun SplashScreen(onFinished: () -> Unit) {
     val iconScale = remember { Animatable(0.4f) }
     val iconAlpha = remember { Animatable(0f) }
     val textAlpha = remember { Animatable(0f) }
-    val textOffsetY = remember { Animatable(24f) }
+    val textOffsetY = remember { Animatable(20f) }
     val dotsAlpha = remember { Animatable(0f) }
     val pulseScale = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
-        iconAlpha.animateTo(1f, animationSpec = tween(300))
-        iconScale.animateTo(1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
-        textAlpha.animateTo(1f, animationSpec = tween(400))
-        textOffsetY.animateTo(0f, animationSpec = tween(400, easing = FastOutSlowInEasing))
+        // Иконка и текст появляются параллельно, плавно
+        launch {
+            iconAlpha.animateTo(1f, tween(450, easing = FastOutSlowInEasing))
+        }
+        launch {
+            iconScale.animateTo(
+                1f,
+                spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
+            )
+        }
+        // Текст чуть позже, но всё равно параллельно с иконкой
+        launch {
+            delay(180)
+            textAlpha.animateTo(1f, tween(450, easing = FastOutSlowInEasing))
+        }
+        launch {
+            delay(180)
+            textOffsetY.animateTo(0f, tween(450, easing = FastOutSlowInEasing))
+        }
+        // Точки появляются после того как всё загрузилось
+        launch {
+            delay(600)
+            dotsAlpha.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
+        }
+
+        // Ждём минимум 1.8с и делаем лёгкий пульс перед выходом
+        delay(1800)
+        launch { pulseScale.animateTo(1.06f, tween(160)) }
+        delay(160)
+        launch { pulseScale.animateTo(1f, tween(160)) }
         delay(200)
-        dotsAlpha.animateTo(1f, animationSpec = tween(300))
-        delay(900)
-        pulseScale.animateTo(1.08f, animationSpec = tween(180))
-        pulseScale.animateTo(1f, animationSpec = tween(180))
-        delay(150)
         onFinished()
     }
 

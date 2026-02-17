@@ -29,6 +29,7 @@ import com.loaderapp.data.model.User
 import com.loaderapp.data.model.UserRole
 import com.loaderapp.ui.theme.GoldStar
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,19 +50,33 @@ fun RoleSelectionScreen(onUserCreated: (User) -> Unit) {
     val btnAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        iconAlpha.animateTo(1f, tween(350))
-        iconScale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
-        delay(80)
-        titleAlpha.animateTo(1f, tween(320))
-        titleOffset.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
-        delay(80)
-        fieldAlpha.animateTo(1f, tween(320))
-        fieldOffset.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
-        delay(80)
-        cardsAlpha.animateTo(1f, tween(320))
-        cardsOffset.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
-        delay(80)
-        btnAlpha.animateTo(1f, tween(320))
+        // Всё запускается параллельно с небольшими задержками (stagger),
+        // но НЕ ждёт завершения предыдущей анимации
+        launch {
+            iconAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
+        }
+        launch {
+            iconScale.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow))
+        }
+        launch {
+            delay(100)
+            titleAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
+            titleOffset.animateTo(0f, tween(380, easing = FastOutSlowInEasing))
+        }
+        launch {
+            delay(180)
+            fieldAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
+            fieldOffset.animateTo(0f, tween(380, easing = FastOutSlowInEasing))
+        }
+        launch {
+            delay(260)
+            cardsAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
+            cardsOffset.animateTo(0f, tween(380, easing = FastOutSlowInEasing))
+        }
+        launch {
+            delay(340)
+            btnAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
+        }
     }
 
     Scaffold { padding ->
