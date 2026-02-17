@@ -24,13 +24,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loaderapp.data.model.Order
@@ -316,11 +321,31 @@ fun LoaderOrdersContent(
     val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 2 })
     val scope = rememberCoroutineScope()
 
-    // Пагер должен быть заблокирован, когда drawer открыт или анимируется,
-    // чтобы жесты не конфликтовали
-    val drawerIsOpen = drawerState?.let {
-        it.currentValue == DrawerValue.Open || it.targetValue == DrawerValue.Open
-    } ?: false
+    // nestedScroll: перехватываем свайп вправо на первой вкладке — открываем drawer
+    val drawerNestedScroll = remember(drawerState, pagerState) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // Свайп влево когда drawer открыт — закрываем его, поглощаем жест
+                if (available.x < 0 && drawerState?.currentValue == DrawerValue.Open) {
+                    scope.launch { drawerState?.close() }
+                    return available
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                // Свайп вправо на первой вкладке — pager не может скроллить дальше, открываем drawer
+                if (available.x > 0 && pagerState.currentPage == 0 && drawerState?.currentValue == DrawerValue.Closed) {
+                    scope.launch { drawerState?.open() }
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                return Velocity.Zero
+            }
+        }
+    }
 
     // Синхронизация pager ↔ selectedTab
     LaunchedEffect(selectedTab) {
@@ -369,9 +394,7 @@ fun LoaderOrdersContent(
             Box(modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize(),
-                    // Блокируем свайп pager'а когда drawer открыт/открывается
-                    userScrollEnabled = !drawerIsOpen
+                    modifier = Modifier.fillMaxSize().nestedScroll(drawerNestedScroll),
                 ) { page ->
                     when (page) {
                         0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, isRefreshing = isRefreshing, onTakeOrder = onTakeOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)
