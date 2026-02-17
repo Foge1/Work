@@ -222,6 +222,7 @@ fun DispatcherScreen(
                     }
             )
         }
+        }
     }
 
     if (showSwitchDialog) {
