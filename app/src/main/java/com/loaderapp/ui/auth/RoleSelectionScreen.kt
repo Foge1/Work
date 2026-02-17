@@ -50,8 +50,9 @@ fun RoleSelectionScreen(onUserCreated: (User) -> Unit) {
     val btnAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        // Всё запускается параллельно с небольшими задержками (stagger),
-        // но НЕ ждёт завершения предыдущей анимации
+        // Ждём завершения crossfade перехода из MainActivity (400ms),
+        // только потом запускаем внутренние анимации параллельно
+        delay(380)
         launch {
             iconAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
         }
@@ -60,22 +61,22 @@ fun RoleSelectionScreen(onUserCreated: (User) -> Unit) {
         }
         launch {
             delay(100)
-            titleAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
-            titleOffset.animateTo(0f, tween(380, easing = FastOutSlowInEasing))
+            titleAlpha.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
+            titleOffset.animateTo(0f, tween(350, easing = FastOutSlowInEasing))
         }
         launch {
             delay(180)
-            fieldAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
-            fieldOffset.animateTo(0f, tween(380, easing = FastOutSlowInEasing))
+            fieldAlpha.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
+            fieldOffset.animateTo(0f, tween(350, easing = FastOutSlowInEasing))
         }
         launch {
             delay(260)
-            cardsAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
-            cardsOffset.animateTo(0f, tween(380, easing = FastOutSlowInEasing))
+            cardsAlpha.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
+            cardsOffset.animateTo(0f, tween(350, easing = FastOutSlowInEasing))
         }
         launch {
             delay(340)
-            btnAlpha.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
+            btnAlpha.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
         }
     }
 

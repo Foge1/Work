@@ -3,14 +3,17 @@ package com.loaderapp.ui.loader
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loaderapp.data.model.Order
 import com.loaderapp.data.model.OrderStatus
+import com.loaderapp.data.model.User
 import com.loaderapp.ui.history.HistoryScreen
 import com.loaderapp.ui.profile.ProfileScreen
 import com.loaderapp.ui.rating.RatingScreen
@@ -59,6 +64,9 @@ fun LoaderScreen(
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+    var selectedOrder by remember { mutableStateOf<Order?>(null) }
 
     var selectedTab by remember { mutableStateOf(0) }
     var showSwitchDialog by remember { mutableStateOf(false) }
@@ -132,7 +140,7 @@ fun LoaderScreen(
     ) {
         AnimatedContent(targetState = currentDestination, transitionSpec = { fadeIn(animationSpec = tween(220)) + slideInHorizontally(animationSpec = tween(220), initialOffsetX = { it / 12 }) togetherWith fadeOut(animationSpec = tween(150)) }, label = "loader_nav") { destination ->
             when (destination) {
-                LoaderDestination.ORDERS -> LoaderOrdersContent(availableOrders = availableOrders, myOrders = myOrders, isLoading = isLoading, userName = userName, selectedTab = selectedTab, activeOrder = activeOrder, onTabSelected = { selectedTab = it }, onMenuClick = { scope.launch { drawerState.open() } }, onTakeOrder = { orderToTake = it }, onCompleteOrder = { order -> viewModel.completeOrder(order); showRatingDialog = order })
+                LoaderDestination.ORDERS -> LoaderOrdersContent(availableOrders = availableOrders, myOrders = myOrders, isLoading = isLoading, isRefreshing = isRefreshing, userName = userName, selectedTab = selectedTab, activeOrder = activeOrder, onTabSelected = { selectedTab = it }, onMenuClick = { scope.launch { drawerState.open() } }, onTakeOrder = { orderToTake = it }, onCompleteOrder = { order -> viewModel.completeOrder(order); showRatingDialog = order }, onOrderClick = { selectedOrder = it }, onRefresh = { viewModel.refresh() })
                 LoaderDestination.SETTINGS -> SettingsScreen(onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = LoaderDestination.ORDERS }, onDarkThemeChanged = onDarkThemeChanged)
                 LoaderDestination.RATING -> RatingScreen(userName = userName, userRating = averageRating?.toDouble() ?: 5.0, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = LoaderDestination.ORDERS }, completedCount = completedCount, totalEarnings = totalEarnings ?: 0.0, averageRating = averageRating ?: 0f, isDispatcher = false)
                 LoaderDestination.HISTORY -> HistoryScreen(orders = myOrders, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = LoaderDestination.ORDERS })
@@ -160,6 +168,22 @@ fun LoaderScreen(
             snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
             viewModel.clearSnackbar()
         }
+    }
+
+    // Детальный bottom sheet для заказа
+    selectedOrder?.let { order ->
+        val dispatcher by produceState<User?>(null, order.dispatcherId) {
+            value = viewModel.getUserById(order.dispatcherId)
+        }
+        val worker by produceState<User?>(null, order.workerId) {
+            value = order.workerId?.let { viewModel.getUserById(it) }
+        }
+        OrderDetailBottomSheet(
+            order = order,
+            dispatcher = dispatcher,
+            worker = worker,
+            onDismiss = { selectedOrder = null }
+        )
     }
 
     if (showSwitchDialog) {
@@ -233,9 +257,10 @@ fun RateOrderDialog(onDismiss: () -> Unit, onRate: (Float) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoaderOrdersContent(
-    availableOrders: List<Order>, myOrders: List<Order>, isLoading: Boolean, userName: String,
-    selectedTab: Int, activeOrder: Order?, onTabSelected: (Int) -> Unit, onMenuClick: () -> Unit,
-    onTakeOrder: (Order) -> Unit, onCompleteOrder: (Order) -> Unit
+    availableOrders: List<Order>, myOrders: List<Order>, isLoading: Boolean, isRefreshing: Boolean,
+    userName: String, selectedTab: Int, activeOrder: Order?, onTabSelected: (Int) -> Unit,
+    onMenuClick: () -> Unit, onTakeOrder: (Order) -> Unit, onCompleteOrder: (Order) -> Unit,
+    onOrderClick: (Order) -> Unit, onRefresh: () -> Unit
 ) {
     val activeOrderCount = myOrders.count { it.status == OrderStatus.TAKEN }
     Scaffold(
@@ -259,8 +284,8 @@ fun LoaderOrdersContent(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (selectedTab) {
-                0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, onTakeOrder = onTakeOrder)
-                1 -> MyOrdersList(orders = myOrders, isLoading = isLoading, activeOrder = activeOrder, onCompleteOrder = onCompleteOrder)
+                0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, isRefreshing = isRefreshing, onTakeOrder = onTakeOrder, onOrderClick = onOrderClick, onRefresh = onRefresh)
+                1 -> MyOrdersList(orders = myOrders, isLoading = isLoading, isRefreshing = isRefreshing, activeOrder = activeOrder, onCompleteOrder = onCompleteOrder, onOrderClick = onOrderClick, onRefresh = onRefresh)
             }
         }
     }
@@ -297,33 +322,39 @@ fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, title: Str
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AvailableOrdersList(orders: List<Order>, isLoading: Boolean, onTakeOrder: (Order) -> Unit) {
-    if (isLoading) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } }; return }
-    if (orders.isEmpty()) { EmptyState(Icons.Default.WorkOff, "Нет доступных заказов", "Новые заказы появятся здесь"); return }
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        itemsIndexed(orders, key = { _, it -> it.id }) { index, order ->
-            var visible by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) { delay(index.toLong() * 60L); visible = true }
-            AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
-                AvailableOrderCard(order = order, onTake = { onTakeOrder(order) })
+fun AvailableOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, onTakeOrder: (Order) -> Unit, onOrderClick: (Order) -> Unit, onRefresh: () -> Unit) {
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh) {
+        if (isLoading && !isRefreshing) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } }; return@PullToRefreshBox }
+        if (orders.isEmpty()) { EmptyState(Icons.Default.WorkOff, "Нет доступных заказов", "Новые заказы появятся здесь"); return@PullToRefreshBox }
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            itemsIndexed(orders, key = { _, it -> it.id }) { index, order ->
+                var visible by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { delay(index.toLong() * 60L); visible = true }
+                AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
+                    AvailableOrderCard(order = order, onTake = { onTakeOrder(order) }, onClick = { onOrderClick(order) })
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MyOrdersList(orders: List<Order>, isLoading: Boolean, activeOrder: Order?, onCompleteOrder: (Order) -> Unit) {
-    if (isLoading) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(3) { SkeletonCard() } }; return }
-    if (orders.isEmpty()) { EmptyState(Icons.Default.AssignmentTurnedIn, "У вас нет заказов", "Возьмите заказ на вкладке «Доступные»"); return }
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        activeOrder?.let { active -> item(key = "active_${active.id}") { ActiveOrderBanner(order = active, onComplete = { onCompleteOrder(active) }) } }
-        items(orders.filter { it.status != OrderStatus.TAKEN }, key = { it.id }) { order -> MyOrderCard(order = order, onComplete = { onCompleteOrder(order) }) }
+fun MyOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, activeOrder: Order?, onCompleteOrder: (Order) -> Unit, onOrderClick: (Order) -> Unit, onRefresh: () -> Unit) {
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh) {
+        if (isLoading && !isRefreshing) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(3) { SkeletonCard() } }; return@PullToRefreshBox }
+        if (orders.isEmpty()) { EmptyState(Icons.Default.AssignmentTurnedIn, "У вас нет заказов", "Возьмите заказ на вкладке «Доступные»"); return@PullToRefreshBox }
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            activeOrder?.let { active -> item(key = "active_${active.id}") { ActiveOrderBanner(order = active, onComplete = { onCompleteOrder(active) }, onClick = { onOrderClick(active) }) } }
+            items(orders.filter { it.status != OrderStatus.TAKEN }, key = { it.id }) { order -> MyOrderCard(order = order, onComplete = { onCompleteOrder(order) }, onClick = { onOrderClick(order) }) }
+        }
     }
 }
 
 @Composable
-fun ActiveOrderBanner(order: Order, onComplete: () -> Unit) {
+fun ActiveOrderBanner(order: Order, onComplete: () -> Unit, onClick: () -> Unit = {}) {
     val haptic = LocalHapticFeedback.current
     val dateFormat = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
     var elapsedSeconds by remember { mutableLongStateOf(0L) }
@@ -361,11 +392,16 @@ fun ActiveOrderBanner(order: Order, onComplete: () -> Unit) {
 }
 
 @Composable
-fun AvailableOrderCard(order: Order, onTake: () -> Unit) {
+fun AvailableOrderCard(order: Order, onTake: () -> Unit, onClick: () -> Unit = {}) {
     val haptic = LocalHapticFeedback.current
     val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
     val accentColor = MaterialTheme.colorScheme.primary
-    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accentColor))
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)) {
@@ -389,10 +425,10 @@ fun AvailableOrderCard(order: Order, onTake: () -> Unit) {
 }
 
 @Composable
-fun MyOrderCard(order: Order, onComplete: () -> Unit) {
+fun MyOrderCard(order: Order, onComplete: () -> Unit, onClick: () -> Unit = {}) {
     val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
     val accentColor = when (order.status) { OrderStatus.AVAILABLE -> MaterialTheme.colorScheme.primary; OrderStatus.TAKEN, OrderStatus.IN_PROGRESS -> StatusOrange; OrderStatus.COMPLETED -> MaterialTheme.colorScheme.secondary; OrderStatus.CANCELLED -> MaterialTheme.colorScheme.error }
-    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), shape = RoundedCornerShape(12.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), shape = RoundedCornerShape(12.dp)) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accentColor))
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)) {
@@ -426,3 +462,103 @@ fun LoaderStatusChip(status: OrderStatus) {
 
 @Composable
 fun StatusChip(status: OrderStatus) = LoaderStatusChip(status)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OrderDetailBottomSheet(
+    order: Order,
+    dispatcher: User?,
+    worker: User?,
+    onDismiss: () -> Unit
+) {
+    val dateFormat = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
+    val sheetState = rememberModalBottomSheetState(skipPartialExpansion = true)
+    val context = LocalContext.current
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
+
+            // Заголовок
+            Text(order.address, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            LoaderStatusChip(status = order.status)
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Дата и время
+            DetailRow(icon = Icons.Default.CalendarMonth, label = "Дата и время", value = dateFormat.format(Date(order.dateTime)))
+
+            // Груз
+            DetailRow(icon = Icons.Default.Inventory, label = "Описание груза", value = order.cargoDescription)
+
+            // Цена
+            DetailRow(icon = Icons.Default.Payments, label = "Оплата", value = buildString {
+                append("${order.pricePerHour.toInt()} ₽/час")
+                if (order.estimatedHours > 1) append(" · ~${order.estimatedHours} ч · ${(order.pricePerHour * order.estimatedHours).toInt()} ₽")
+            })
+
+            // Комментарий
+            if (order.comment.isNotBlank()) {
+                DetailRow(icon = Icons.Default.Comment, label = "Комментарий", value = order.comment)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Диспетчер
+            if (dispatcher != null) {
+                Text("Диспетчер", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+                ContactCard(name = dispatcher.name, phone = dispatcher.phone, context = context)
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Грузчик (если взят)
+            if (worker != null) {
+                Text("Грузчик", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+                ContactCard(name = worker.name, phone = worker.phone, context = context)
+            }
+        }
+    }
+}
+
+@Composable
+fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.Top) {
+        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp).padding(top = 2.dp))
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+fun ContactCard(name: String, phone: String, context: android.content.Context) {
+    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Text(name.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                if (phone.isNotBlank()) Text(phone, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (phone.isNotBlank()) {
+                IconButton(onClick = {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$phone"))
+                    context.startActivity(intent)
+                }) {
+                    Icon(Icons.Default.Phone, contentDescription = "Позвонить", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
+}

@@ -93,8 +93,8 @@ fun MainScreen() {
                         AnimatedContent(
                             targetState = currentUser,
                             transitionSpec = {
-                                fadeIn(tween(350)) + slideInHorizontally(tween(350), initialOffsetX = { it / 8 }) togetherWith
-                                fadeOut(tween(250)) + slideOutHorizontally(tween(250), targetOffsetX = { -it / 8 })
+                                fadeIn(tween(400, easing = FastOutSlowInEasing)) togetherWith
+                                fadeOut(tween(250, easing = FastOutSlowInEasing))
                             },
                             label = "screen_transition"
                         ) { user ->

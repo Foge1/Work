@@ -77,6 +77,19 @@ class LoaderViewModel(
         }
     }
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            kotlinx.coroutines.delay(600)
+            _isRefreshing.value = false
+        }
+    }
+
+    suspend fun getUserById(id: Long): User? = repository.getUserById(id)
+
     fun takeOrder(order: Order) {
         viewModelScope.launch {
             try {

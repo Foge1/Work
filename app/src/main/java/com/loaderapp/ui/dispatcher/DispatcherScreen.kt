@@ -3,14 +3,17 @@ package com.loaderapp.ui.dispatcher
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,6 +62,9 @@ fun DispatcherScreen(
 
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+    var selectedOrder by remember { mutableStateOf<Order?>(null) }
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showSwitchDialog by remember { mutableStateOf(false) }
@@ -128,7 +135,7 @@ fun DispatcherScreen(
     ) {
         AnimatedContent(targetState = currentDestination, transitionSpec = { fadeIn(animationSpec = tween(220)) + slideInHorizontally(animationSpec = tween(220), initialOffsetX = { it / 12 }) togetherWith fadeOut(animationSpec = tween(150)) }, label = "dispatcher_nav") { destination ->
             when (destination) {
-                DispatcherDestination.ORDERS -> OrdersContent(orders = orders, isLoading = isLoading, userName = userName, selectedTab = selectedTab, tabs = tabs, availableCount = availableCount, takenCount = takenCount, searchQuery = searchQuery, isSearchActive = isSearchActive, onTabSelected = { selectedTab = it }, onMenuClick = { scope.launch { drawerState.open() } }, onCreateOrder = { showCreateDialog = true }, onCancelOrder = { viewModel.cancelOrder(it) }, onSearchQueryChange = { viewModel.setSearchQuery(it) }, onSearchToggle = { viewModel.setSearchActive(it) })
+                DispatcherDestination.ORDERS -> OrdersContent(orders = orders, isLoading = isLoading, isRefreshing = isRefreshing, userName = userName, selectedTab = selectedTab, tabs = tabs, availableCount = availableCount, takenCount = takenCount, searchQuery = searchQuery, isSearchActive = isSearchActive, onTabSelected = { selectedTab = it }, onMenuClick = { scope.launch { drawerState.open() } }, onCreateOrder = { showCreateDialog = true }, onCancelOrder = { viewModel.cancelOrder(it) }, onSearchQueryChange = { viewModel.setSearchQuery(it) }, onSearchToggle = { viewModel.setSearchActive(it) }, onOrderClick = { selectedOrder = it }, onRefresh = { viewModel.refresh() })
                 DispatcherDestination.SETTINGS -> SettingsScreen(onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = DispatcherDestination.ORDERS }, onDarkThemeChanged = onDarkThemeChanged)
                 DispatcherDestination.RATING -> RatingScreen(userName = userName, userRating = 5.0, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = DispatcherDestination.ORDERS }, dispatcherCompletedCount = completedCount, dispatcherActiveCount = activeCount, isDispatcher = true)
                 DispatcherDestination.HISTORY -> HistoryScreen(orders = orders, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = DispatcherDestination.ORDERS })
@@ -148,6 +155,22 @@ fun DispatcherScreen(
                 }
             }
         }
+    }
+
+    // Детальный bottom sheet
+    selectedOrder?.let { order ->
+        val dispatcher by produceState<com.loaderapp.data.model.User?>(null, order.dispatcherId) {
+            value = viewModel.getUserById(order.dispatcherId)
+        }
+        val worker by produceState<com.loaderapp.data.model.User?>(null, order.workerId) {
+            value = order.workerId?.let { viewModel.getUserById(it) }
+        }
+        com.loaderapp.ui.loader.OrderDetailBottomSheet(
+            order = order,
+            dispatcher = dispatcher,
+            worker = worker,
+            onDismiss = { selectedOrder = null }
+        )
     }
 
     if (showCreateDialog) {
@@ -170,10 +193,12 @@ fun DispatcherScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrdersContent(
-    orders: List<Order>, isLoading: Boolean, userName: String, selectedTab: Int, tabs: List<String>,
-    availableCount: Int, takenCount: Int, searchQuery: String, isSearchActive: Boolean,
-    onTabSelected: (Int) -> Unit, onMenuClick: () -> Unit, onCreateOrder: () -> Unit,
-    onCancelOrder: (Order) -> Unit, onSearchQueryChange: (String) -> Unit, onSearchToggle: (Boolean) -> Unit
+    orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, userName: String,
+    selectedTab: Int, tabs: List<String>, availableCount: Int, takenCount: Int,
+    searchQuery: String, isSearchActive: Boolean, onTabSelected: (Int) -> Unit,
+    onMenuClick: () -> Unit, onCreateOrder: () -> Unit, onCancelOrder: (Order) -> Unit,
+    onSearchQueryChange: (String) -> Unit, onSearchToggle: (Boolean) -> Unit,
+    onOrderClick: (Order) -> Unit, onRefresh: () -> Unit
 ) {
     val availableOrders = orders.filter { it.status == OrderStatus.AVAILABLE }
     val takenOrders = orders.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
@@ -221,10 +246,13 @@ fun OrdersContent(
             )
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            val currentOrders = if (selectedTab == 0) availableOrders else takenOrders
-
-            if (isLoading) {
+        val currentOrders = if (selectedTab == 0) availableOrders else takenOrders
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
+            if (isLoading && !isRefreshing) {
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } }
             } else if (currentOrders.isEmpty()) {
                 val (icon, title, subtitle) = if (selectedTab == 0)
@@ -238,7 +266,7 @@ fun OrdersContent(
                         var visible by remember { mutableStateOf(false) }
                         LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 60L); visible = true }
                         AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
-                            OrderCard(order = order, onCancel = { onCancelOrder(it) })
+                            OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) })
                         }
                     }
                 }
@@ -248,7 +276,7 @@ fun OrdersContent(
 }
 
 @Composable
-fun OrderCard(order: Order, onCancel: (Order) -> Unit) {
+fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {}) {
     val haptic = LocalHapticFeedback.current
     val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
     val accentColor = when (order.status) {
@@ -257,7 +285,7 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit) {
         OrderStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
         OrderStatus.CANCELLED -> MaterialTheme.colorScheme.error
     }
-    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), shape = RoundedCornerShape(12.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), shape = RoundedCornerShape(12.dp)) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accentColor))
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)) {
