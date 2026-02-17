@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,19 +26,18 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loaderapp.data.model.Order
 import com.loaderapp.data.model.OrderStatus
+import com.loaderapp.data.model.User
 import com.loaderapp.ui.history.HistoryScreen
 import com.loaderapp.ui.loader.EmptyState
 import com.loaderapp.ui.loader.SkeletonCard
 import com.loaderapp.ui.rating.RatingScreen
 import com.loaderapp.ui.settings.SettingsScreen
-import com.loaderapp.ui.theme.GoldStar
 import com.loaderapp.ui.theme.StatusOrange
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -43,13 +45,14 @@ import java.util.*
 
 enum class DispatcherDestination { ORDERS, SETTINGS, RATING, HISTORY, PROFILE }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun DispatcherScreen(
     viewModel: DispatcherViewModel,
     userName: String,
     onSwitchRole: () -> Unit,
-    onDarkThemeChanged: ((Boolean) -> Unit)? = null
+    onDarkThemeChanged: ((Boolean) -> Unit)? = null,
+    onOrderClick: (Order, User?, User?) -> Unit = { _, _, _ -> }
 ) {
     val orders by viewModel.orders.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -58,19 +61,15 @@ fun DispatcherScreen(
     val isSearchActive by viewModel.isSearchActive.collectAsState()
     val completedCount by viewModel.completedCount.collectAsState(initial = 0)
     val activeCount by viewModel.activeCount.collectAsState(initial = 0)
-
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-
     val isRefreshing by viewModel.isRefreshing.collectAsState()
-    var selectedOrder by remember { mutableStateOf<Order?>(null) }
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showSwitchDialog by remember { mutableStateOf(false) }
     var currentDestination by remember { mutableStateOf(DispatcherDestination.ORDERS) }
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Свободные", "В работе")
-
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -90,12 +89,12 @@ fun DispatcherScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { scope.launch { drawerState.close() } }) {
-                        Icon(Icons.Default.Menu, contentDescription = "Закрыть меню", tint = MaterialTheme.colorScheme.onSurface)
+                        Icon(Icons.Default.Menu, "Закрыть меню", tint = MaterialTheme.colorScheme.onSurface)
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     Column {
-                        Text(text = userName, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text(text = "Диспетчер", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(userName, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("Диспетчер", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 HorizontalDivider()
@@ -106,15 +105,14 @@ fun DispatcherScreen(
                     val textColor = if (selected) primary else MaterialTheme.colorScheme.onSurfaceVariant
                     Row(
                         modifier = Modifier.fillMaxWidth().height(48.dp).background(
-                            if (selected) Brush.horizontalGradient(listOf(primary.copy(alpha = 0.15f), Color.Transparent))
+                            if (selected) Brush.horizontalGradient(listOf(primary.copy(0.15f), Color.Transparent))
                             else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
-                        ),
-                        verticalAlignment = Alignment.CenterVertically
+                        ), verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primary.copy(alpha = if (selected) 1f else 0f)))
+                        Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primary.copy(if (selected) 1f else 0f)))
                         Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent, onClick = onClick) {
                             Row(modifier = Modifier.fillMaxSize().padding(start = 20.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(text = label, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = textColor)
+                                Text(label, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = textColor)
                                 if (badge > 0) Badge(containerColor = primary) { Text("$badge", fontSize = 11.sp, color = Color.White) }
                             }
                         }
@@ -132,12 +130,51 @@ fun DispatcherScreen(
             }
         }
     ) {
-        AnimatedContent(targetState = currentDestination, transitionSpec = { fadeIn(animationSpec = tween(220)) + slideInHorizontally(animationSpec = tween(220), initialOffsetX = { it / 12 }) togetherWith fadeOut(animationSpec = tween(150)) }, label = "dispatcher_nav") { destination ->
+        AnimatedContent(
+            targetState = currentDestination,
+            transitionSpec = {
+                fadeIn(tween(220)) + slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it / 10 } togetherWith
+                fadeOut(tween(160))
+            },
+            label = "dispatcher_nav"
+        ) { destination ->
             when (destination) {
-                DispatcherDestination.ORDERS -> OrdersContent(orders = orders, isLoading = isLoading, isRefreshing = isRefreshing, userName = userName, selectedTab = selectedTab, tabs = tabs, availableCount = availableCount, takenCount = takenCount, searchQuery = searchQuery, isSearchActive = isSearchActive, onTabSelected = { selectedTab = it }, onMenuClick = { scope.launch { drawerState.open() } }, onCreateOrder = { showCreateDialog = true }, onCancelOrder = { viewModel.cancelOrder(it) }, onSearchQueryChange = { viewModel.setSearchQuery(it) }, onSearchToggle = { viewModel.setSearchActive(it) }, onOrderClick = { selectedOrder = it }, onRefresh = { viewModel.refresh() })
-                DispatcherDestination.SETTINGS -> SettingsScreen(onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = DispatcherDestination.ORDERS }, onDarkThemeChanged = onDarkThemeChanged)
-                DispatcherDestination.RATING -> RatingScreen(userName = userName, userRating = 5.0, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = DispatcherDestination.ORDERS }, dispatcherCompletedCount = completedCount, dispatcherActiveCount = activeCount, isDispatcher = true)
-                DispatcherDestination.HISTORY -> HistoryScreen(orders = orders, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = DispatcherDestination.ORDERS })
+                DispatcherDestination.ORDERS -> OrdersContent(
+                    orders = orders, isLoading = isLoading, isRefreshing = isRefreshing,
+                    userName = userName, selectedTab = selectedTab, tabs = tabs,
+                    availableCount = availableCount, takenCount = takenCount,
+                    searchQuery = searchQuery, isSearchActive = isSearchActive,
+                    onTabSelected = { selectedTab = it },
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onCreateOrder = { showCreateDialog = true },
+                    onCancelOrder = { viewModel.cancelOrder(it) },
+                    onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                    onSearchToggle = { viewModel.setSearchActive(it) },
+                    onOrderClick = { order ->
+                        scope.launch {
+                            val dispatcher = viewModel.getUserById(order.dispatcherId)
+                            val worker = order.workerId?.let { viewModel.getUserById(it) }
+                            onOrderClick(order, dispatcher, worker)
+                        }
+                    },
+                    onRefresh = { viewModel.refresh() }
+                )
+                DispatcherDestination.SETTINGS -> SettingsScreen(
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onBackClick = { currentDestination = DispatcherDestination.ORDERS },
+                    onDarkThemeChanged = onDarkThemeChanged
+                )
+                DispatcherDestination.RATING -> RatingScreen(
+                    userName = userName, userRating = 5.0,
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onBackClick = { currentDestination = DispatcherDestination.ORDERS },
+                    dispatcherCompletedCount = completedCount, dispatcherActiveCount = activeCount, isDispatcher = true
+                )
+                DispatcherDestination.HISTORY -> HistoryScreen(
+                    orders = orders,
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onBackClick = { currentDestination = DispatcherDestination.ORDERS }
+                )
                 DispatcherDestination.PROFILE -> {
                     val currentUser by viewModel.currentUser.collectAsState()
                     val completedCnt by viewModel.completedCount.collectAsState(initial = 0)
@@ -156,29 +193,23 @@ fun DispatcherScreen(
         }
     }
 
-    // Детальный bottom sheet
-    selectedOrder?.let { order ->
-        val dispatcher by produceState<com.loaderapp.data.model.User?>(null, order.dispatcherId) {
-            value = viewModel.getUserById(order.dispatcherId)
-        }
-        val worker by produceState<com.loaderapp.data.model.User?>(null, order.workerId) {
-            value = order.workerId?.let { viewModel.getUserById(it) }
-        }
-        com.loaderapp.ui.loader.OrderDetailBottomSheet(
-            order = order,
-            dispatcher = dispatcher,
-            worker = worker,
-            onDismiss = { selectedOrder = null }
+    if (showCreateDialog) {
+        CreateOrderDialog(
+            onDismiss = { showCreateDialog = false },
+            onCreate = { address, dateTime, cargo, price, hours, comment ->
+                viewModel.createOrder(address, dateTime, cargo, price, hours, comment)
+                showCreateDialog = false
+            }
         )
     }
-
-    if (showCreateDialog) {
-        CreateOrderDialog(onDismiss = { showCreateDialog = false }, onCreate = { address, dateTime, cargo, price, hours, comment -> viewModel.createOrder(address, dateTime, cargo, price, hours, comment); showCreateDialog = false })
-    }
     if (showSwitchDialog) {
-        AlertDialog(onDismissRequest = { showSwitchDialog = false }, title = { Text("Сменить роль?") }, text = { Text("Вы хотите выйти из режима диспетчера?") },
+        AlertDialog(
+            onDismissRequest = { showSwitchDialog = false },
+            title = { Text("Сменить роль?") },
+            text = { Text("Вы хотите выйти из режима диспетчера?") },
             confirmButton = { TextButton(onClick = { showSwitchDialog = false; onSwitchRole() }) { Text("Да") } },
-            dismissButton = { TextButton(onClick = { showSwitchDialog = false }) { Text("Отмена") } })
+            dismissButton = { TextButton(onClick = { showSwitchDialog = false }) { Text("Отмена") } }
+        )
     }
     errorMessage?.let { LaunchedEffect(it) { viewModel.clearError() } }
     snackbarMessage?.let { msg ->
@@ -189,7 +220,7 @@ fun DispatcherScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun OrdersContent(
     orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, userName: String,
@@ -203,36 +234,62 @@ fun OrdersContent(
     val takenOrders = orders.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
     val focusRequester = remember { FocusRequester() }
 
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = onRefresh
+    )
+
     Scaffold(
         topBar = {
             Column {
                 TopAppBar(
                     title = {
                         if (isSearchActive) {
-                            OutlinedTextField(value = searchQuery, onValueChange = onSearchQueryChange, placeholder = { Text("Поиск заказов...") }, singleLine = true, modifier = Modifier.fillMaxWidth().focusRequester(focusRequester), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent))
+                            OutlinedTextField(
+                                value = searchQuery, onValueChange = onSearchQueryChange,
+                                placeholder = { Text("Поиск заказов...") }, singleLine = true,
+                                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent)
+                            )
                             LaunchedEffect(Unit) { focusRequester.requestFocus() }
                         } else {
-                            Column { Text("Панель диспетчера", fontWeight = FontWeight.SemiBold); Text(text = userName, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            Column {
+                                Text("Панель диспетчера", fontWeight = FontWeight.SemiBold)
+                                Text(userName, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     },
                     navigationIcon = {
                         if (isSearchActive) {
-                            IconButton(onClick = { onSearchToggle(false) }) { Icon(Icons.Default.ArrowBack, contentDescription = "Назад") }
+                            IconButton(onClick = { onSearchToggle(false) }) { Icon(Icons.Default.ArrowBack, "Назад") }
                         } else {
                             Box {
-                                IconButton(onClick = onMenuClick) { Icon(Icons.Default.Menu, contentDescription = "Меню") }
-                                if (availableCount > 0) Badge(modifier = Modifier.align(Alignment.TopEnd).offset(x = (-4).dp, y = 4.dp), containerColor = MaterialTheme.colorScheme.primary) { Text("$availableCount", fontSize = 9.sp, color = Color.White) }
+                                IconButton(onClick = onMenuClick) { Icon(Icons.Default.Menu, "Меню") }
+                                if (availableCount > 0) Badge(
+                                    modifier = Modifier.align(Alignment.TopEnd).offset(x = (-4).dp, y = 4.dp),
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                ) { Text("$availableCount", fontSize = 9.sp, color = Color.White) }
                             }
                         }
                     },
                     actions = {
-                        if (!isSearchActive) IconButton(onClick = { onSearchToggle(true) }) { Icon(Icons.Default.Search, contentDescription = "Поиск") }
-                        else if (searchQuery.isNotEmpty()) IconButton(onClick = { onSearchQueryChange("") }) { Icon(Icons.Default.Clear, contentDescription = "Очистить") }
+                        if (!isSearchActive) IconButton(onClick = { onSearchToggle(true) }) { Icon(Icons.Default.Search, "Поиск") }
+                        else if (searchQuery.isNotEmpty()) IconButton(onClick = { onSearchQueryChange("") }) { Icon(Icons.Default.Clear, "Очистить") }
                     }
                 )
                 TabRow(selectedTabIndex = selectedTab) {
-                    Tab(selected = selectedTab == 0, onClick = { onTabSelected(0) }, text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Text("Свободные"); if (availableCount > 0) Badge(containerColor = MaterialTheme.colorScheme.primary) { Text("$availableCount", fontSize = 10.sp, color = Color.White) } } })
-                    Tab(selected = selectedTab == 1, onClick = { onTabSelected(1) }, text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Text("В работе"); if (takenCount > 0) Badge(containerColor = StatusOrange) { Text("$takenCount", fontSize = 10.sp, color = Color.White) } } })
+                    Tab(selected = selectedTab == 0, onClick = { onTabSelected(0) }, text = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Свободные")
+                            if (availableCount > 0) Badge(containerColor = MaterialTheme.colorScheme.primary) { Text("$availableCount", fontSize = 10.sp, color = Color.White) }
+                        }
+                    })
+                    Tab(selected = selectedTab == 1, onClick = { onTabSelected(1) }, text = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("В работе")
+                            if (takenCount > 0) Badge(containerColor = StatusOrange) { Text("$takenCount", fontSize = 10.sp, color = Color.White) }
+                        }
+                    })
                 }
             }
         },
@@ -240,46 +297,50 @@ fun OrdersContent(
             val haptic = LocalHapticFeedback.current
             ExtendedFloatingActionButton(
                 onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onCreateOrder() },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                icon = { Icon(Icons.Default.Add, null) },
                 text = { Text("Создать заказ") }
             )
         }
     ) { padding ->
         val currentOrders = if (selectedTab == 0) availableOrders else takenOrders
+
         Box(
-            modifier = Modifier.fillMaxSize().padding(padding)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .pullRefresh(pullRefreshState)
         ) {
             when {
-                isLoading && !isRefreshing -> {
-                    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } }
+                isLoading && !isRefreshing -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(4) { SkeletonCard() }
                 }
                 currentOrders.isEmpty() -> {
                     val icon = if (selectedTab == 0) Icons.Default.Inbox else Icons.Default.Assignment
-                    val title = if (selectedTab == 0) {
-                        if (isSearchActive && searchQuery.isNotEmpty()) "Заказы не найдены" else "Нет свободных заказов"
-                    } else "Нет заказов в работе"
-                    val subtitle = if (selectedTab == 0) {
-                        if (isSearchActive && searchQuery.isNotEmpty()) "Попробуйте другой запрос" else "Создайте первый заказ"
-                    } else "Свободные заказы появятся здесь"
+                    val title = if (selectedTab == 0) { if (isSearchActive && searchQuery.isNotEmpty()) "Заказы не найдены" else "Нет свободных заказов" } else "Нет заказов в работе"
+                    val subtitle = if (selectedTab == 0) { if (isSearchActive && searchQuery.isNotEmpty()) "Попробуйте другой запрос" else "Создайте первый заказ" } else "Свободные заказы появятся здесь"
                     EmptyState(icon = icon, title = title, subtitle = subtitle)
                 }
-                else -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        itemsIndexed(currentOrders, key = { _, it -> it.id }) { index, order ->
-                            var visible by remember { mutableStateOf(false) }
-                            LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 60L); visible = true }
-                            AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
-                                OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) })
-                            }
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    itemsIndexed(currentOrders, key = { _, it -> it.id }) { index, order ->
+                        var visible by remember { mutableStateOf(false) }
+                        LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 50L); visible = true }
+                        AnimatedVisibility(visible, enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 4 }) {
+                            OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) })
                         }
                     }
                 }
             }
-            if (isRefreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)
-                )
-            }
+
+            PullRefreshIndicator(
+                refreshing = isRefreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                contentColor = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
@@ -294,13 +355,16 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {})
         OrderStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
         OrderStatus.CANCELLED -> MaterialTheme.colorScheme.error
     }
-    Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), shape = RoundedCornerShape(12.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        elevation = CardDefaults.cardElevation(2.dp), shape = RoundedCornerShape(12.dp)
+    ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accentColor))
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = order.address, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    StatusChip(status = order.status)
+                    Text(order.address, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    StatusChip(order.status)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -325,6 +389,14 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {})
 
 @Composable
 fun StatusChip(status: OrderStatus) {
-    val (text, color) = when (status) { OrderStatus.AVAILABLE -> "Доступен" to MaterialTheme.colorScheme.primary; OrderStatus.TAKEN -> "Занят" to StatusOrange; OrderStatus.IN_PROGRESS -> "В процессе" to StatusOrange; OrderStatus.COMPLETED -> "Завершён" to MaterialTheme.colorScheme.secondary; OrderStatus.CANCELLED -> "Отменён" to MaterialTheme.colorScheme.error }
-    Surface(color = color.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) { Text(text = text, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color) }
+    val (text, color) = when (status) {
+        OrderStatus.AVAILABLE -> "Доступен" to MaterialTheme.colorScheme.primary
+        OrderStatus.TAKEN -> "Занят" to StatusOrange
+        OrderStatus.IN_PROGRESS -> "В процессе" to StatusOrange
+        OrderStatus.COMPLETED -> "Завершён" to MaterialTheme.colorScheme.secondary
+        OrderStatus.CANCELLED -> "Отменён" to MaterialTheme.colorScheme.error
+    }
+    Surface(color = color.copy(0.12f), shape = RoundedCornerShape(6.dp)) {
+        Text(text, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
+    }
 }

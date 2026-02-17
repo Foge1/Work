@@ -61,12 +61,8 @@ fun SplashScreen(onFinished: () -> Unit) {
             dotsAlpha.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
         }
 
-        // Ждём минимум 1.8с и делаем лёгкий пульс перед выходом
+        // Ждём 1.8с, затем плавно исчезаем
         delay(1800)
-        launch { pulseScale.animateTo(1.06f, tween(160)) }
-        delay(160)
-        launch { pulseScale.animateTo(1f, tween(160)) }
-        delay(200)
         onFinished()
     }
 
