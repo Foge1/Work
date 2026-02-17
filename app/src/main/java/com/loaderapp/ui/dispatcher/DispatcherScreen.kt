@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -209,8 +210,12 @@ fun OrdersContent(
                 EmptyState(icon = icon, title = title, subtitle = subtitle)
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(currentOrders, key = { it.id }) { order ->
-                        OrderCard(order = order, onCancel = { onCancelOrder(it) })
+                    itemsIndexed(currentOrders, key = { _, it -> it.id }) { index, order ->
+                        var visible by remember { mutableStateOf(false) }
+                        LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 60L); visible = true }
+                        AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
+                            OrderCard(order = order, onCancel = { onCancelOrder(it) })
+                        }
                     }
                 }
             }

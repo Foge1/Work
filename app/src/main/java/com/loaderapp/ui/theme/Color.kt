@@ -2,7 +2,7 @@ package com.loaderapp.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Светлая тема — насыщенный бирюзовый
+// Светлая тема
 val Emerald80 = Color(0xFF80D8E8)
 val EmeraldGrey80 = Color(0xFFB2D4DC)
 val Mint80 = Color(0xFFA8DCE8)
@@ -19,5 +19,9 @@ val StatusRed = Color(0xFFE74C3C)
 val GoldStar = Color(0xFFFFC107)
 
 // Skeleton shimmer
-val ShimmerLight = Color(0xFFE8F4F8)
-val ShimmerDark = Color(0xFF2A3135)
+val ShimmerLight = Color(0xFFD8EAEE)
+val ShimmerDark = Color(0xFF2A3438)
+
+// Splash градиент
+val SplashStart = Color(0xFF006978)
+val SplashEnd = Color(0xFF004F5A)

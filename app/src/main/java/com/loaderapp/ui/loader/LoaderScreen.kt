@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -245,7 +246,7 @@ fun LoaderOrdersContent(
 fun SkeletonCard() {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val alpha by transition.animateFloat(initialValue = 0.3f, targetValue = 0.9f, animationSpec = infiniteRepeatable(animation = tween(900, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse), label = "alpha")
-    val shimmerColor = ShimmerLight
+    val shimmerColor = if (MaterialTheme.colorScheme.surface.value < 0xFF888888u) ShimmerDark else ShimmerLight
     Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), shape = RoundedCornerShape(12.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Box(modifier = Modifier.fillMaxWidth(0.6f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(shimmerColor.copy(alpha = alpha)))
@@ -277,7 +278,13 @@ fun AvailableOrdersList(orders: List<Order>, isLoading: Boolean, onTakeOrder: (O
     if (isLoading) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } }; return }
     if (orders.isEmpty()) { EmptyState(Icons.Default.WorkOff, "Нет доступных заказов", "Новые заказы появятся здесь"); return }
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(orders, key = { it.id }) { order -> AvailableOrderCard(order = order, onTake = { onTakeOrder(order) }) }
+        itemsIndexed(orders, key = { _, it -> it.id }) { index, order ->
+            var visible by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { delay(index.toLong() * 60L); visible = true }
+            AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
+                AvailableOrderCard(order = order, onTake = { onTakeOrder(order) })
+            }
+        }
     }
 }
 
