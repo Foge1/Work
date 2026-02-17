@@ -353,7 +353,7 @@ fun OrdersContent(
                             modifier = Modifier
                                 .weight(1f)
                                 .background(
-                                    if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                                    if (selected) MaterialTheme.colorScheme.background else Color.Transparent,
                                     RoundedCornerShape(50)
                                 )
                                 .clickable { scope.launch { pagerState.animateScrollToPage(index) } }
@@ -465,11 +465,7 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
     }
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            // Gradient overlay сверху по цвету статуса
+        elevation = CardDefaults.cardElevation(0.dp),
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

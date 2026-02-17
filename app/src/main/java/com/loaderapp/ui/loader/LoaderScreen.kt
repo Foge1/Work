@@ -400,7 +400,7 @@ fun LoaderOrdersContent(
                             modifier = Modifier
                                 .weight(1f)
                                 .background(
-                                    if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                                    if (selected) MaterialTheme.colorScheme.background else Color.Transparent,
                                     RoundedCornerShape(50)
                                 )
                                 .clickable { scope.launch { pagerState.animateScrollToPage(index) } }
@@ -453,7 +453,7 @@ fun SkeletonCard() {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val alpha by transition.animateFloat(0.3f, 0.9f, infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "alpha")
     val shimmerColor = if (MaterialTheme.colorScheme.surface.value < 0xFF888888u) ShimmerDark else ShimmerLight
-    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(1.dp), shape = RoundedCornerShape(12.dp)) {
+    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(0.dp), shape = RoundedCornerShape(12.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Box(modifier = Modifier.fillMaxWidth(0.6f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(shimmerColor.copy(alpha)))
             Spacer(modifier = Modifier.height(8.dp))
@@ -595,7 +595,7 @@ fun ActiveOrderBanner(order: Order, workerCount: Int = 0, onComplete: () -> Unit
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        elevation = CardDefaults.cardElevation(4.dp)
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -639,7 +639,7 @@ fun AvailableOrderCard(order: Order, workerCount: Int = 0, onTake: () -> Unit, o
     val accentColor = MaterialTheme.colorScheme.primary
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        elevation = CardDefaults.cardElevation(2.dp),
+        elevation = CardDefaults.cardElevation(0.dp),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -699,7 +699,7 @@ fun MyOrderCard(order: Order, workerCount: Int = 0, onComplete: () -> Unit, onCl
         OrderStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
         OrderStatus.CANCELLED -> MaterialTheme.colorScheme.error
     }
-    Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, elevation = CardDefaults.cardElevation(2.dp), shape = MaterialTheme.shapes.medium) {
+    Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, elevation = CardDefaults.cardElevation(0.dp), shape = MaterialTheme.shapes.medium) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
