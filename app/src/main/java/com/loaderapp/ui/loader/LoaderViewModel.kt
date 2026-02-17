@@ -11,6 +11,7 @@ import com.loaderapp.notification.NotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class LoaderViewModel(
@@ -60,22 +61,6 @@ class LoaderViewModel(
         viewModelScope.launch {
             repository.getUserByIdFlow(loaderId).collect { user ->
                 _currentUser.value = user
-                // При получении пользователя обновляем доступные заказы с учётом рейтинга
-                if (user != null) reloadAvailableWithRating(user.rating.toFloat())
-            }
-        }
-    }
-
-    private fun reloadAvailableWithRating(myRating: Float) {
-        viewModelScope.launch {
-            repository.getAvailableOrders().collect { orders ->
-                val filtered = orders.filter { order ->
-                    // Фильтр по мин. рейтингу
-                    myRating >= order.minWorkerRating
-                }
-                _availableOrders.value = filtered
-                // Загружаем счётчики грузчиков для видимых заказов
-                updateWorkerCounts(filtered)
             }
         }
     }
@@ -83,9 +68,15 @@ class LoaderViewModel(
     private fun loadAvailableOrders() {
         viewModelScope.launch {
             try {
-                repository.getAvailableOrders().collect { orders ->
-                    val myRating = _currentUser.value?.rating?.toFloat() ?: 5f
-                    val filtered = orders.filter { it.minWorkerRating <= myRating }
+                // Объединяем поток доступных заказов и поток текущего пользователя,
+                // чтобы фильтрация по рейтингу всегда актуальна без двух параллельных подписок
+                kotlinx.coroutines.flow.combine(
+                    repository.getAvailableOrders(),
+                    _currentUser
+                ) { orders, user ->
+                    val myRating = user?.rating?.toFloat() ?: 5f
+                    orders.filter { it.minWorkerRating <= myRating }
+                }.collect { filtered ->
                     _availableOrders.value = filtered
                     updateWorkerCounts(filtered)
                 }
@@ -141,8 +132,6 @@ class LoaderViewModel(
     fun refresh() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            val myRating = _currentUser.value?.rating?.toFloat() ?: 5f
-            val orders = repository.getAvailableOrders()
             updateWorkerCounts(_availableOrders.value + _myOrders.value)
             kotlinx.coroutines.delay(600)
             _isRefreshing.value = false

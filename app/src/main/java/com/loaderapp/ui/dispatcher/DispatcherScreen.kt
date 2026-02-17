@@ -28,9 +28,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -82,9 +79,8 @@ fun DispatcherScreen(
     val takenCount = orders.count { it.status == OrderStatus.TAKEN || it.status == OrderStatus.IN_PROGRESS }
 
     ModalNavigationDrawer(
-        gesturesEnabled = drawerState.isOpen,
         drawerState = drawerState,
-        gesturesEnabled = false,
+        gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.width(240.dp),
@@ -116,7 +112,98 @@ fun DispatcherScreen(
                             else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
                         ), verticalAlignment = Alignment.CenterVertically
                     ) {
-                        
+                        Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primary.copy(if (selected) 1f else 0f)))
+                        Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent, onClick = onClick) {
+                            Row(modifier = Modifier.fillMaxSize().padding(start = 20.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(label, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = textColor)
+                                if (badge > 0) Badge(containerColor = primary) { Text("$badge", fontSize = 11.sp, color = Color.White) }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                DrawerItem("Заказы", currentDestination == DispatcherDestination.ORDERS, badge = availableCount) { currentDestination = DispatcherDestination.ORDERS; scope.launch { drawerState.close() } }
+                DrawerItem("Профиль", currentDestination == DispatcherDestination.PROFILE) { currentDestination = DispatcherDestination.PROFILE; scope.launch { drawerState.close() } }
+                DrawerItem("Рейтинг", currentDestination == DispatcherDestination.RATING) { currentDestination = DispatcherDestination.RATING; scope.launch { drawerState.close() } }
+                DrawerItem("История", currentDestination == DispatcherDestination.HISTORY) { currentDestination = DispatcherDestination.HISTORY; scope.launch { drawerState.close() } }
+                DrawerItem("Настройки", currentDestination == DispatcherDestination.SETTINGS) { currentDestination = DispatcherDestination.SETTINGS; scope.launch { drawerState.close() } }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                DrawerItem("Сменить роль", false) { showSwitchDialog = true; scope.launch { drawerState.close() } }
+            }
+        }
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AnimatedContent(
+            targetState = currentDestination,
+            transitionSpec = {
+                fadeIn(tween(220)) + slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it / 10 } togetherWith
+                fadeOut(tween(160))
+            },
+            label = "dispatcher_nav"
+        ) { destination ->
+            when (destination) {
+                DispatcherDestination.ORDERS -> OrdersContent(
+                    orders = orders, isLoading = isLoading, isRefreshing = isRefreshing,
+                    userName = userName, selectedTab = selectedTab, tabs = tabs,
+                    availableCount = availableCount, takenCount = takenCount,
+                    completedCount = completedCount,
+                    searchQuery = searchQuery, isSearchActive = isSearchActive,
+                    onTabSelected = { selectedTab = it },
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onCreateOrder = { currentDestination = DispatcherDestination.CREATE },
+                    onCancelOrder = { viewModel.cancelOrder(it) },
+                    onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                    onSearchToggle = { viewModel.setSearchActive(it) },
+                    onOrderClick = { order ->
+                        scope.launch {
+                            val dispatcher = viewModel.getUserById(order.dispatcherId)
+                            val worker = order.workerId?.let { viewModel.getUserById(it) }
+                            onOrderClick(order, dispatcher, worker)
+                        }
+                    },
+                    onRefresh = { viewModel.refresh() },
+                    workerCounts = workerCounts,
+                    drawerState = drawerState
+                )
+                DispatcherDestination.CREATE -> CreateOrderScreen(
+                    onBack = { currentDestination = DispatcherDestination.ORDERS },
+                    onCreate = { address, dateTime, cargo, price, hours, comment, requiredWorkers, minRating ->
+                        viewModel.createOrder(address, dateTime, cargo, price, hours, comment, requiredWorkers, minRating)
+                        currentDestination = DispatcherDestination.ORDERS
+                    }
+                )
+                DispatcherDestination.SETTINGS -> SettingsScreen(
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onBackClick = { currentDestination = DispatcherDestination.ORDERS },
+                    onDarkThemeChanged = onDarkThemeChanged
+                )
+                DispatcherDestination.RATING -> RatingScreen(
+                    userName = userName, userRating = 5.0,
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onBackClick = { currentDestination = DispatcherDestination.ORDERS },
+                    dispatcherCompletedCount = completedCount, dispatcherActiveCount = activeCount, isDispatcher = true
+                )
+                DispatcherDestination.HISTORY -> HistoryScreen(
+                    orders = orders,
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onBackClick = { currentDestination = DispatcherDestination.ORDERS }
+                )
+                DispatcherDestination.PROFILE -> {
+                    val currentUser by viewModel.currentUser.collectAsState()
+                    val completedCnt by viewModel.completedCount.collectAsState(initial = 0)
+                    val activeCnt by viewModel.activeCount.collectAsState(initial = 0)
+                    currentUser?.let { user ->
+                        com.loaderapp.ui.profile.ProfileScreen(
+                            user = user,
+                            dispatcherCompletedCount = completedCnt,
+                            dispatcherActiveCount = activeCnt,
+                            onMenuClick = { scope.launch { drawerState.open() } },
+                            onSaveProfile = { name, phone, birthDate -> viewModel.saveProfile(name, phone, birthDate) }
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -148,14 +235,19 @@ fun OrdersContent(
     onMenuClick: () -> Unit, onCreateOrder: () -> Unit, onCancelOrder: (Order) -> Unit,
     onSearchQueryChange: (String) -> Unit, onSearchToggle: (Boolean) -> Unit,
     onOrderClick: (Order) -> Unit, onRefresh: () -> Unit,
-    workerCounts: Map<Long, Int> = emptyMap()
+    workerCounts: Map<Long, Int> = emptyMap(),
+    drawerState: DrawerState? = null
 ) {
     val availableOrders = orders.filter { it.status == OrderStatus.AVAILABLE }
-    val takenOrders = orders.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
+    val takenOrders = orders.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.IN_PROGRESS }
     val focusRequester = remember { FocusRequester() }
     val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 2 })
     val scope = rememberCoroutineScope()
     val pullRefreshState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
+
+    val drawerIsOpen = drawerState?.let {
+        it.currentValue == DrawerValue.Open || it.targetValue == DrawerValue.Open
+    } ?: false
 
     // Синхронизация pager ↔ selectedTab
     LaunchedEffect(selectedTab) {
@@ -233,7 +325,8 @@ fun OrdersContent(
         Box(modifier = Modifier.fillMaxSize().padding(padding).pullRefresh(pullRefreshState)) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = !drawerIsOpen
             ) { page ->
                 val currentOrders = if (page == 0) availableOrders else takenOrders
                 when {

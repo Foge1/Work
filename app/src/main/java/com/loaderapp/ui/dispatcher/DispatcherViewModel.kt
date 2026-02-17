@@ -50,8 +50,7 @@ class DispatcherViewModel(
     val workerCounts: StateFlow<Map<Long, Int>> = _workerCounts.asStateFlow()
 
     init {
-        loadOrders()
-        observeSearch()
+        observeOrdersWithSearch()
         loadCurrentUser()
     }
 
@@ -61,27 +60,25 @@ class DispatcherViewModel(
         }
     }
 
-    private fun loadOrders() {
+    private fun observeOrdersWithSearch() {
         viewModelScope.launch {
+            _isLoading.value = true
             try {
-                repository.getOrdersByDispatcher(dispatcherId).collect { orders ->
+                // Единый поток: если поиск пустой — все заказы диспетчера, иначе — фильтрованные
+                _searchQuery.debounce(300).flatMapLatest { query ->
+                    if (query.isBlank()) repository.getOrdersByDispatcher(dispatcherId)
+                    else repository.searchOrdersByDispatcher(dispatcherId, query)
+                }.collect { orders ->
                     _orders.value = orders
+                    _isLoading.value = false
                     val counts = mutableMapOf<Long, Int>()
                     orders.forEach { counts[it.id] = repository.getWorkerCountSync(it.id) }
                     _workerCounts.value = counts
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Ошибка загрузки заказов: ${e.message}"
+                _isLoading.value = false
             }
-        }
-    }
-
-    private fun observeSearch() {
-        viewModelScope.launch {
-            _searchQuery.debounce(300).flatMapLatest { query ->
-                if (query.isBlank()) repository.getOrdersByDispatcher(dispatcherId)
-                else repository.searchOrdersByDispatcher(dispatcherId, query)
-            }.collect { _orders.value = it }
         }
     }
 

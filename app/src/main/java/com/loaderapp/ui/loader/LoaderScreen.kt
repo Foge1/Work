@@ -4,7 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,7 +22,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -86,7 +84,7 @@ fun LoaderScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = false,
+        gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -172,7 +170,8 @@ fun LoaderScreen(
                         }
                     },
                     onRefresh = { viewModel.refresh() },
-                    workerCounts = workerCounts
+                    workerCounts = workerCounts,
+                    drawerState = drawerState
                 )
                 LoaderDestination.SETTINGS -> SettingsScreen(
                     onMenuClick = { scope.launch { drawerState.open() } },
@@ -200,22 +199,6 @@ fun LoaderScreen(
                     )
                 }
             }
-        }
-
-            // Невидимая зона по левому краю для свайпа открытия drawer
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(20.dp)
-                    .align(Alignment.CenterStart)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures { _, dragAmount ->
-                            if (dragAmount > 10f) {
-                                scope.launch { drawerState.open() }
-                            }
-                        }
-                    }
-            )
         }
     }
 
@@ -325,11 +308,18 @@ fun LoaderOrdersContent(
     completedCount: Int = 0,
     onMenuClick: () -> Unit, onTakeOrder: (Order) -> Unit, onCompleteOrder: (Order) -> Unit,
     onOrderClick: (Order) -> Unit, onRefresh: () -> Unit,
-    workerCounts: Map<Long, Int> = emptyMap()
+    workerCounts: Map<Long, Int> = emptyMap(),
+    drawerState: DrawerState? = null
 ) {
     val activeOrderCount = myOrders.count { it.status == OrderStatus.TAKEN }
     val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 2 })
     val scope = rememberCoroutineScope()
+
+    // Пагер должен быть заблокирован, когда drawer открыт или анимируется,
+    // чтобы жесты не конфликтовали
+    val drawerIsOpen = drawerState?.let {
+        it.currentValue == DrawerValue.Open || it.targetValue == DrawerValue.Open
+    } ?: false
 
     // Синхронизация pager ↔ selectedTab
     LaunchedEffect(selectedTab) {
@@ -378,7 +368,9 @@ fun LoaderOrdersContent(
             Box(modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    // Блокируем свайп pager'а когда drawer открыт/открывается
+                    userScrollEnabled = !drawerIsOpen
                 ) { page ->
                     when (page) {
                         0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, isRefreshing = isRefreshing, onTakeOrder = onTakeOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)
