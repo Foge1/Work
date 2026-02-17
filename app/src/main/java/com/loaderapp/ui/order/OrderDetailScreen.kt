@@ -44,7 +44,8 @@ fun OrderDetailScreen(
     onTakeOrder: ((Order) -> Unit)? = null,
     onCompleteOrder: ((Order) -> Unit)? = null,
     onCancelOrder: ((Order) -> Unit)? = null,
-    isDispatcher: Boolean = false
+    isDispatcher: Boolean = false,
+    workerCount: Int = 0
 ) {
     val context = LocalContext.current
     val dateFormat = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
@@ -160,12 +161,21 @@ fun OrderDetailScreen(
                             )
                             if (order.estimatedHours > 1) {
                                 Text(
-                                    text = "  ·  ~${order.estimatedHours} ч  ·  ${(order.pricePerHour * order.estimatedHours).toInt()} ₽",
+                                    text = "  ·  ~${(order.pricePerHour * order.estimatedHours).toInt()} ₽",
                                     fontSize = 14.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
                             }
+                        }
+
+                        // Прогресс грузчиков
+                        if (order.requiredWorkers > 1) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            com.loaderapp.ui.loader.WorkerProgressBadge(
+                                current = workerCount,
+                                required = order.requiredWorkers
+                            )
                         }
                     }
                 }
@@ -194,12 +204,22 @@ fun OrderDetailScreen(
                         value = order.cargoDescription,
                         color = accentColor
                     )
-                    DetailRow(
-                        icon = Icons.Default.AccessTime,
-                        label = "Ожидаемое время",
-                        value = if (order.estimatedHours > 1) "~${order.estimatedHours} часов" else "~1 час",
-                        color = accentColor
-                    )
+                    if (order.requiredWorkers > 1) {
+                        DetailRow(
+                            icon = Icons.Default.Group,
+                            label = "Грузчиков нужно",
+                            value = "${order.requiredWorkers} чел.",
+                            color = accentColor
+                        )
+                    }
+                    if (order.minWorkerRating > 0f) {
+                        DetailRow(
+                            icon = Icons.Default.Star,
+                            label = "Минимальный рейтинг",
+                            value = "от ${order.minWorkerRating}",
+                            color = accentColor
+                        )
+                    }
                     if (order.comment.isNotBlank()) {
                         DetailRow(
                             icon = Icons.Default.Comment,

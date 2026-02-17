@@ -11,6 +11,7 @@ import com.loaderapp.notification.NotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class LoaderViewModel(
@@ -39,9 +40,16 @@ class LoaderViewModel(
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
+    // workerCount для каждого заказа: orderId -> count
+    private val _workerCounts = MutableStateFlow<Map<Long, Int>>(emptyMap())
+    val workerCounts: StateFlow<Map<Long, Int>> = _workerCounts.asStateFlow()
+
     val completedCount = repository.getCompletedOrdersCount(loaderId)
     val totalEarnings = repository.getTotalEarnings(loaderId)
     val averageRating = repository.getAverageRating(loaderId)
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     init {
         loadAvailableOrders()
@@ -51,14 +59,37 @@ class LoaderViewModel(
 
     private fun loadCurrentUser() {
         viewModelScope.launch {
-            repository.getUserByIdFlow(loaderId).collect { _currentUser.value = it }
+            repository.getUserByIdFlow(loaderId).collect { user ->
+                _currentUser.value = user
+                // При получении пользователя обновляем доступные заказы с учётом рейтинга
+                if (user != null) reloadAvailableWithRating(user.rating.toFloat())
+            }
+        }
+    }
+
+    private fun reloadAvailableWithRating(myRating: Float) {
+        viewModelScope.launch {
+            repository.getAvailableOrders().collect { orders ->
+                val filtered = orders.filter { order ->
+                    // Фильтр по мин. рейтингу
+                    myRating >= order.minWorkerRating
+                }
+                _availableOrders.value = filtered
+                // Загружаем счётчики грузчиков для видимых заказов
+                updateWorkerCounts(filtered)
+            }
         }
     }
 
     private fun loadAvailableOrders() {
         viewModelScope.launch {
             try {
-                repository.getAvailableOrders().collect { _availableOrders.value = it }
+                repository.getAvailableOrders().collect { orders ->
+                    val myRating = _currentUser.value?.rating?.toFloat() ?: 5f
+                    val filtered = orders.filter { it.minWorkerRating <= myRating }
+                    _availableOrders.value = filtered
+                    updateWorkerCounts(filtered)
+                }
             } catch (e: Exception) {
                 _errorMessage.value = "Ошибка загрузки заказов: ${e.message}"
             }
@@ -69,7 +100,9 @@ class LoaderViewModel(
         viewModelScope.launch {
             try {
                 repository.getOrdersByWorker(loaderId).collect { list ->
-                    _myOrders.value = list.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
+                    val myList = list.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
+                    _myOrders.value = myList
+                    updateWorkerCounts(myList)
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Ошибка загрузки моих заказов: ${e.message}"
@@ -77,12 +110,20 @@ class LoaderViewModel(
         }
     }
 
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    private suspend fun updateWorkerCounts(orders: List<Order>) {
+        val counts = mutableMapOf<Long, Int>()
+        orders.forEach { order ->
+            counts[order.id] = repository.getWorkerCountSync(order.id)
+        }
+        _workerCounts.value = counts
+    }
 
     fun refresh() {
         viewModelScope.launch {
             _isRefreshing.value = true
+            val myRating = _currentUser.value?.rating?.toFloat() ?: 5f
+            val orders = repository.getAvailableOrders()
+            updateWorkerCounts(_availableOrders.value + _myOrders.value)
             kotlinx.coroutines.delay(600)
             _isRefreshing.value = false
         }
@@ -95,13 +136,22 @@ class LoaderViewModel(
             try {
                 _isLoading.value = true
                 val current = repository.getOrderById(order.id)
-                if (current?.status == OrderStatus.AVAILABLE) {
+                if (current != null && current.status == OrderStatus.AVAILABLE) {
+                    // Проверяем что грузчик ещё не взял этот заказ
+                    val alreadyTaken = repository.hasWorkerTakenOrder(order.id, loaderId)
+                    if (alreadyTaken) {
+                        _snackbarMessage.value = "⚠️ Вы уже взяли этот заказ"
+                        return@launch
+                    }
                     repository.takeOrder(order.id, loaderId)
                     val loader = repository.getUserById(loaderId)
                     if (loader != null) notificationHelper.sendOrderTakenNotification(order.address, loader.name)
+                    // Обновляем счётчик
+                    val newCount = repository.getWorkerCountSync(order.id)
+                    _workerCounts.value = _workerCounts.value + (order.id to newCount)
                     _snackbarMessage.value = "✅ Заказ взят!"
                 } else {
-                    _snackbarMessage.value = "⚠️ Заказ уже занят другим грузчиком"
+                    _snackbarMessage.value = "⚠️ Заказ больше недоступен"
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Ошибка взятия заказа: ${e.message}"

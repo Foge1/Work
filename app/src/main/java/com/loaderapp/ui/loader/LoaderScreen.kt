@@ -68,6 +68,7 @@ fun LoaderScreen(
     val currentUser by viewModel.currentUser.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val workerCounts by viewModel.workerCounts.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) }
     var showSwitchDialog by remember { mutableStateOf(false) }
@@ -162,7 +163,8 @@ fun LoaderScreen(
                             onOrderClick(order, dispatcher, worker)
                         }
                     },
-                    onRefresh = { viewModel.refresh() }
+                    onRefresh = { viewModel.refresh() },
+                    workerCounts = workerCounts
                 )
                 LoaderDestination.SETTINGS -> SettingsScreen(
                     onMenuClick = { scope.launch { drawerState.open() } },
@@ -297,7 +299,8 @@ fun LoaderOrdersContent(
     availableOrders: List<Order>, myOrders: List<Order>, isLoading: Boolean, isRefreshing: Boolean,
     userName: String, selectedTab: Int, activeOrder: Order?, onTabSelected: (Int) -> Unit,
     onMenuClick: () -> Unit, onTakeOrder: (Order) -> Unit, onCompleteOrder: (Order) -> Unit,
-    onOrderClick: (Order) -> Unit, onRefresh: () -> Unit
+    onOrderClick: (Order) -> Unit, onRefresh: () -> Unit,
+    workerCounts: Map<Long, Int> = emptyMap()
 ) {
     val activeOrderCount = myOrders.count { it.status == OrderStatus.TAKEN }
 
@@ -337,8 +340,8 @@ fun LoaderOrdersContent(
             val pullRefreshState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
             Box(modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
                 when (selectedTab) {
-                    0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, isRefreshing = isRefreshing, onTakeOrder = onTakeOrder, onOrderClick = onOrderClick)
-                    1 -> MyOrdersList(orders = myOrders, isLoading = isLoading, isRefreshing = isRefreshing, activeOrder = activeOrder, onCompleteOrder = onCompleteOrder, onOrderClick = onOrderClick)
+                    0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, isRefreshing = isRefreshing, onTakeOrder = onTakeOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)
+                    1 -> MyOrdersList(orders = myOrders, isLoading = isLoading, isRefreshing = isRefreshing, activeOrder = activeOrder, onCompleteOrder = onCompleteOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)
                 }
                 PullRefreshIndicator(
                     refreshing = isRefreshing, state = pullRefreshState,
@@ -384,7 +387,7 @@ fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, title: Str
 }
 
 @Composable
-fun AvailableOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, onTakeOrder: (Order) -> Unit, onOrderClick: (Order) -> Unit) {
+fun AvailableOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, onTakeOrder: (Order) -> Unit, onOrderClick: (Order) -> Unit, workerCounts: Map<Long, Int> = emptyMap()) {
     when {
         isLoading && !isRefreshing -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } }
         orders.isEmpty() -> EmptyState(Icons.Default.WorkOff, "Нет доступных заказов", "Новые заказы появятся здесь")
@@ -393,7 +396,7 @@ fun AvailableOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: B
                 var visible by remember { mutableStateOf(false) }
                 LaunchedEffect(Unit) { delay(index.toLong() * 50L); visible = true }
                 AnimatedVisibility(visible, enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 4 }) {
-                    AvailableOrderCard(order = order, onTake = { onTakeOrder(order) }, onClick = { onOrderClick(order) })
+                    AvailableOrderCard(order = order, workerCount = workerCounts[order.id] ?: 0, onTake = { onTakeOrder(order) }, onClick = { onOrderClick(order) })
                 }
             }
         }
@@ -401,25 +404,25 @@ fun AvailableOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: B
 }
 
 @Composable
-fun MyOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, activeOrder: Order?, onCompleteOrder: (Order) -> Unit, onOrderClick: (Order) -> Unit) {
+fun MyOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, activeOrder: Order?, onCompleteOrder: (Order) -> Unit, onOrderClick: (Order) -> Unit, workerCounts: Map<Long, Int> = emptyMap()) {
     when {
         isLoading && !isRefreshing -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(3) { SkeletonCard() } }
         orders.isEmpty() -> EmptyState(Icons.Default.AssignmentTurnedIn, "У вас нет заказов", "Возьмите заказ на вкладке «Доступные»")
         else -> LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             activeOrder?.let { active ->
                 item(key = "active_${active.id}") {
-                    ActiveOrderBanner(order = active, onComplete = { onCompleteOrder(active) }, onClick = { onOrderClick(active) })
+                    ActiveOrderBanner(order = active, workerCount = workerCounts[active.id] ?: 0, onComplete = { onCompleteOrder(active) }, onClick = { onOrderClick(active) })
                 }
             }
             items(orders.filter { it.status != OrderStatus.TAKEN }, key = { it.id }) { order ->
-                MyOrderCard(order = order, onComplete = { onCompleteOrder(order) }, onClick = { onOrderClick(order) })
+                MyOrderCard(order = order, workerCount = workerCounts[order.id] ?: 0, onComplete = { onCompleteOrder(order) }, onClick = { onOrderClick(order) })
             }
         }
     }
 }
 
 @Composable
-fun ActiveOrderBanner(order: Order, onComplete: () -> Unit, onClick: () -> Unit = {}) {
+fun ActiveOrderBanner(order: Order, workerCount: Int = 0, onComplete: () -> Unit, onClick: () -> Unit = {}) {
     val haptic = LocalHapticFeedback.current
     val dateFormat = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
     var elapsedSeconds by remember { mutableLongStateOf(0L) }
@@ -450,6 +453,9 @@ fun ActiveOrderBanner(order: Order, onComplete: () -> Unit, onClick: () -> Unit 
             Spacer(modifier = Modifier.height(10.dp))
             Text(order.address, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
             Text("${dateFormat.format(Date(order.dateTime))} · ${order.cargoDescription}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f), modifier = Modifier.padding(top = 2.dp))
+            if (order.requiredWorkers > 1) {
+                WorkerProgressBadge(current = workerCount, required = order.requiredWorkers, modifier = Modifier.padding(top = 6.dp))
+            }
             Text("${order.pricePerHour.toInt()} ₽/час", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
             Spacer(modifier = Modifier.height(12.dp))
             Button(
@@ -465,7 +471,7 @@ fun ActiveOrderBanner(order: Order, onComplete: () -> Unit, onClick: () -> Unit 
 }
 
 @Composable
-fun AvailableOrderCard(order: Order, onTake: () -> Unit, onClick: () -> Unit = {}) {
+fun AvailableOrderCard(order: Order, workerCount: Int = 0, onTake: () -> Unit, onClick: () -> Unit = {}) {
     val haptic = LocalHapticFeedback.current
     val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
     val accentColor = MaterialTheme.colorScheme.primary
@@ -482,6 +488,21 @@ fun AvailableOrderCard(order: Order, onTake: () -> Unit, onClick: () -> Unit = {
                 Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(order.cargoDescription, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
                 if (order.comment.isNotBlank()) Text("💬 ${order.comment}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+                if (order.requiredWorkers > 1 || order.minWorkerRating > 0f) {
+                    Row(modifier = Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (order.requiredWorkers > 1) {
+                            WorkerProgressBadge(current = workerCount, required = order.requiredWorkers)
+                        }
+                        if (order.minWorkerRating > 0f) {
+                            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Star, null, tint = com.loaderapp.ui.theme.GoldStar, modifier = Modifier.size(12.dp))
+                                    Text(" от ${order.minWorkerRating}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
                 Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${order.pricePerHour.toInt()} ₽/час", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = accentColor)
                     if (order.estimatedHours > 1) Text(" · ~${order.estimatedHours} ч · ${(order.pricePerHour * order.estimatedHours).toInt()} ₽", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -500,7 +521,7 @@ fun AvailableOrderCard(order: Order, onTake: () -> Unit, onClick: () -> Unit = {
 }
 
 @Composable
-fun MyOrderCard(order: Order, onComplete: () -> Unit, onClick: () -> Unit = {}) {
+fun MyOrderCard(order: Order, workerCount: Int = 0, onComplete: () -> Unit, onClick: () -> Unit = {}) {
     val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
     val accentColor = when (order.status) {
         OrderStatus.AVAILABLE -> MaterialTheme.colorScheme.primary
@@ -522,6 +543,9 @@ fun MyOrderCard(order: Order, onComplete: () -> Unit, onClick: () -> Unit = {}) 
                 Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${order.pricePerHour.toInt()} ₽/час", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = accentColor)
                     if (order.estimatedHours > 1) Text(" · ~${(order.pricePerHour * order.estimatedHours).toInt()} ₽", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (order.requiredWorkers > 1) {
+                    WorkerProgressBadge(current = workerCount, required = order.requiredWorkers, modifier = Modifier.padding(top = 4.dp))
                 }
                 order.workerRating?.let { rating ->
                     Row(modifier = Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -550,3 +574,32 @@ fun LoaderStatusChip(status: OrderStatus) {
 
 @Composable
 fun StatusChip(status: OrderStatus) = LoaderStatusChip(status)
+
+@Composable
+fun WorkerProgressBadge(current: Int, required: Int, modifier: Modifier = Modifier) {
+    val filled = current.coerceAtMost(required)
+    val color = when {
+        filled >= required -> MaterialTheme.colorScheme.secondary
+        filled > 0 -> StatusOrange
+        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    }
+    Surface(
+        color = color.copy(alpha = 0.13f),
+        shape = RoundedCornerShape(6.dp),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(Icons.Default.Group, null, tint = color, modifier = Modifier.size(13.dp))
+            Text(
+                text = "$filled / $required чел.",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = color
+            )
+        }
+    }
+}

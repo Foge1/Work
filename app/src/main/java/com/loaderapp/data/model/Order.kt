@@ -8,23 +8,25 @@ data class Order(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val address: String,
-    val dateTime: Long, // timestamp в миллисекундах
+    val dateTime: Long,
     val cargoDescription: String,
     val pricePerHour: Double,
-    val estimatedHours: Int = 1, // Ожидаемое количество часов
+    val estimatedHours: Int = 1,
+    val requiredWorkers: Int = 1,       // сколько грузчиков нужно
+    val minWorkerRating: Float = 0f,    // минимальный рейтинг грузчика
     val status: OrderStatus = OrderStatus.AVAILABLE,
     val createdAt: Long = System.currentTimeMillis(),
-    val completedAt: Long? = null, // Время завершения
-    val workerId: Long? = null, // ID грузчика, который взял заказ
-    val dispatcherId: Long = 0, // ID диспетчера, который создал заказ
-    val workerRating: Float? = null, // Оценка грузчика за этот заказ (1-5)
-    val comment: String = "" // Комментарий к заказу
+    val completedAt: Long? = null,
+    val workerId: Long? = null,         // первый взявший (для обратной совместимости)
+    val dispatcherId: Long = 0,
+    val workerRating: Float? = null,
+    val comment: String = ""
 )
 
 enum class OrderStatus {
-    AVAILABLE,    // Доступен для взятия
-    TAKEN,        // Взят грузчиком
-    IN_PROGRESS,  // В процессе выполнения
-    COMPLETED,    // Выполнен
-    CANCELLED     // Отменен
+    AVAILABLE,
+    TAKEN,
+    IN_PROGRESS,
+    COMPLETED,
+    CANCELLED
 }

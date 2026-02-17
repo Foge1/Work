@@ -60,6 +60,7 @@ private sealed class AppScreen {
         val dispatcher: User?,
         val worker: User?,
         val isDispatcher: Boolean,
+        val workerCount: Int = 0,
         val onTake: ((Order) -> Unit)?,
         val onComplete: ((Order) -> Unit)?,
         val onCancel: ((Order) -> Unit)?
@@ -160,6 +161,7 @@ fun MainScreen() {
                                     dispatcher = dispatcher,
                                     worker = worker,
                                     isDispatcher = true,
+                                    workerCount = viewModel.workerCounts.value[order.id] ?: 0,
                                     onTake = null,
                                     onComplete = null,
                                     onCancel = { o -> viewModel.cancelOrder(o); screen = AppScreen.Dispatcher(s.user) }
@@ -183,6 +185,7 @@ fun MainScreen() {
                                     dispatcher = dispatcher,
                                     worker = worker,
                                     isDispatcher = false,
+                                    workerCount = viewModel.workerCounts.value[order.id] ?: 0,
                                     onTake = { o ->
                                         viewModel.takeOrder(o)
                                         screen = AppScreen.Loader(s.user)
@@ -202,6 +205,7 @@ fun MainScreen() {
                         dispatcher = s.dispatcher,
                         worker = s.worker,
                         isDispatcher = s.isDispatcher,
+                        workerCount = s.workerCount,
                         onBack = { screen = if (currentUser?.role == UserRole.DISPATCHER) AppScreen.Dispatcher(currentUser!!) else AppScreen.Loader(currentUser!!) },
                         onTakeOrder = s.onTake,
                         onCompleteOrder = s.onComplete,

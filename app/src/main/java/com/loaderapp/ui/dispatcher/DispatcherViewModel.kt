@@ -46,6 +46,9 @@ class DispatcherViewModel(
     val completedCount = repository.getDispatcherCompletedCount(dispatcherId)
     val activeCount = repository.getDispatcherActiveCount(dispatcherId)
 
+    private val _workerCounts = MutableStateFlow<Map<Long, Int>>(emptyMap())
+    val workerCounts: StateFlow<Map<Long, Int>> = _workerCounts.asStateFlow()
+
     init {
         loadOrders()
         observeSearch()
@@ -61,7 +64,12 @@ class DispatcherViewModel(
     private fun loadOrders() {
         viewModelScope.launch {
             try {
-                repository.getOrdersByDispatcher(dispatcherId).collect { _orders.value = it }
+                repository.getOrdersByDispatcher(dispatcherId).collect { orders ->
+                    _orders.value = orders
+                    val counts = mutableMapOf<Long, Int>()
+                    orders.forEach { counts[it.id] = repository.getWorkerCountSync(it.id) }
+                    _workerCounts.value = counts
+                }
             } catch (e: Exception) {
                 _errorMessage.value = "Ошибка загрузки заказов: ${e.message}"
             }
@@ -93,11 +101,20 @@ class DispatcherViewModel(
 
     suspend fun getUserById(id: Long): User? = repository.getUserById(id)
 
-    fun createOrder(address: String, dateTime: Long, cargoDescription: String, pricePerHour: Double, estimatedHours: Int = 1, comment: String = "") {
+    fun createOrder(
+        address: String, dateTime: Long, cargoDescription: String,
+        pricePerHour: Double, estimatedHours: Int = 1, comment: String = "",
+        requiredWorkers: Int = 1, minWorkerRating: Float = 0f
+    ) {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
-                val order = Order(address = address, dateTime = dateTime, cargoDescription = cargoDescription, pricePerHour = pricePerHour, estimatedHours = estimatedHours, comment = comment, status = OrderStatus.AVAILABLE, dispatcherId = dispatcherId)
+                val order = Order(
+                    address = address, dateTime = dateTime, cargoDescription = cargoDescription,
+                    pricePerHour = pricePerHour, estimatedHours = estimatedHours, comment = comment,
+                    requiredWorkers = requiredWorkers, minWorkerRating = minWorkerRating,
+                    status = OrderStatus.AVAILABLE, dispatcherId = dispatcherId
+                )
                 repository.createOrder(order)
                 notificationHelper.sendNewOrderNotification(address, pricePerHour)
                 _snackbarMessage.value = "✅ Заказ создан"

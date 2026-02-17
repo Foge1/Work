@@ -64,6 +64,7 @@ fun DispatcherScreen(
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val workerCounts by viewModel.workerCounts.collectAsState()
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showSwitchDialog by remember { mutableStateOf(false) }
@@ -157,7 +158,8 @@ fun DispatcherScreen(
                             onOrderClick(order, dispatcher, worker)
                         }
                     },
-                    onRefresh = { viewModel.refresh() }
+                    onRefresh = { viewModel.refresh() },
+                    workerCounts = workerCounts
                 )
                 DispatcherDestination.SETTINGS -> SettingsScreen(
                     onMenuClick = { scope.launch { drawerState.open() } },
@@ -196,8 +198,8 @@ fun DispatcherScreen(
     if (showCreateDialog) {
         CreateOrderDialog(
             onDismiss = { showCreateDialog = false },
-            onCreate = { address, dateTime, cargo, price, hours, comment ->
-                viewModel.createOrder(address, dateTime, cargo, price, hours, comment)
+            onCreate = { address, dateTime, cargo, price, hours, comment, requiredWorkers, minRating ->
+                viewModel.createOrder(address, dateTime, cargo, price, hours, comment, requiredWorkers, minRating)
                 showCreateDialog = false
             }
         )
@@ -228,7 +230,8 @@ fun OrdersContent(
     searchQuery: String, isSearchActive: Boolean, onTabSelected: (Int) -> Unit,
     onMenuClick: () -> Unit, onCreateOrder: () -> Unit, onCancelOrder: (Order) -> Unit,
     onSearchQueryChange: (String) -> Unit, onSearchToggle: (Boolean) -> Unit,
-    onOrderClick: (Order) -> Unit, onRefresh: () -> Unit
+    onOrderClick: (Order) -> Unit, onRefresh: () -> Unit,
+    workerCounts: Map<Long, Int> = emptyMap()
 ) {
     val availableOrders = orders.filter { it.status == OrderStatus.AVAILABLE }
     val takenOrders = orders.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
@@ -329,7 +332,7 @@ fun OrdersContent(
                         var visible by remember { mutableStateOf(false) }
                         LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 50L); visible = true }
                         AnimatedVisibility(visible, enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 4 }) {
-                            OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) })
+                            OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) }, workerCount = workerCounts[order.id] ?: 0)
                         }
                     }
                 }
@@ -346,7 +349,7 @@ fun OrdersContent(
 }
 
 @Composable
-fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {}) {
+fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {}, workerCount: Int = 0) {
     val haptic = LocalHapticFeedback.current
     val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
     val accentColor = when (order.status) {
@@ -370,6 +373,21 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {})
                 Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(order.cargoDescription, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
                 if (order.comment.isNotBlank()) Text("💬 ${order.comment}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+                if (order.requiredWorkers > 1 || order.minWorkerRating > 0f) {
+                    Row(modifier = Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (order.requiredWorkers > 1) {
+                            com.loaderapp.ui.loader.WorkerProgressBadge(current = workerCount, required = order.requiredWorkers)
+                        }
+                        if (order.minWorkerRating > 0f) {
+                            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Star, null, tint = com.loaderapp.ui.theme.GoldStar, modifier = Modifier.size(12.dp))
+                                    Text(" от ${order.minWorkerRating}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
                 Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${order.pricePerHour.toInt()} ₽/час", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = accentColor)
                     if (order.estimatedHours > 1) Text(" · ~${order.estimatedHours} ч · ${(order.pricePerHour * order.estimatedHours).toInt()} ₽", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
