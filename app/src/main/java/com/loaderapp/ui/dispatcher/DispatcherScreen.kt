@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -247,9 +246,7 @@ fun OrdersContent(
         }
     ) { padding ->
         val currentOrders = if (selectedTab == 0) availableOrders else takenOrders
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = onRefresh,
+        Box(
             modifier = Modifier.fillMaxSize().padding(padding)
         ) {
             when {
@@ -277,6 +274,11 @@ fun OrdersContent(
                         }
                     }
                 }
+            }
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)
+                )
             }
         }
     }

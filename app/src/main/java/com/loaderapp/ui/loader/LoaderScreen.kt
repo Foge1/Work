@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -325,31 +324,41 @@ fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, title: Str
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AvailableOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, onTakeOrder: (Order) -> Unit, onOrderClick: (Order) -> Unit, onRefresh: () -> Unit) {
-    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh) {
-        if (isLoading && !isRefreshing) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } }; return@PullToRefreshBox }
-        if (orders.isEmpty()) { EmptyState(Icons.Default.WorkOff, "Нет доступных заказов", "Новые заказы появятся здесь"); return@PullToRefreshBox }
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            itemsIndexed(orders, key = { _, it -> it.id }) { index, order ->
-                var visible by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { delay(index.toLong() * 60L); visible = true }
-                AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
-                    AvailableOrderCard(order = order, onTake = { onTakeOrder(order) }, onClick = { onOrderClick(order) })
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            isLoading && !isRefreshing -> { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } } }
+            orders.isEmpty() -> { EmptyState(Icons.Default.WorkOff, "Нет доступных заказов", "Новые заказы появятся здесь") }
+            else -> {
+                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    itemsIndexed(orders, key = { _, it -> it.id }) { index, order ->
+                        var visible by remember { mutableStateOf(false) }
+                        LaunchedEffect(Unit) { delay(index.toLong() * 60L); visible = true }
+                        AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
+                            AvailableOrderCard(order = order, onTake = { onTakeOrder(order) }, onClick = { onOrderClick(order) })
+                        }
+                    }
                 }
             }
         }
+        if (isRefreshing) { CircularProgressIndicator(modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)) }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyOrdersList(orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, activeOrder: Order?, onCompleteOrder: (Order) -> Unit, onOrderClick: (Order) -> Unit, onRefresh: () -> Unit) {
-    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh) {
-        if (isLoading && !isRefreshing) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(3) { SkeletonCard() } }; return@PullToRefreshBox }
-        if (orders.isEmpty()) { EmptyState(Icons.Default.AssignmentTurnedIn, "У вас нет заказов", "Возьмите заказ на вкладке «Доступные»"); return@PullToRefreshBox }
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            activeOrder?.let { active -> item(key = "active_${active.id}") { ActiveOrderBanner(order = active, onComplete = { onCompleteOrder(active) }, onClick = { onOrderClick(active) }) } }
-            items(orders.filter { it.status != OrderStatus.TAKEN }, key = { it.id }) { order -> MyOrderCard(order = order, onComplete = { onCompleteOrder(order) }, onClick = { onOrderClick(order) }) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            isLoading && !isRefreshing -> { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(3) { SkeletonCard() } } }
+            orders.isEmpty() -> { EmptyState(Icons.Default.AssignmentTurnedIn, "У вас нет заказов", "Возьмите заказ на вкладке «Доступные»") }
+            else -> {
+                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    activeOrder?.let { active -> item(key = "active_${active.id}") { ActiveOrderBanner(order = active, onComplete = { onCompleteOrder(active) }, onClick = { onOrderClick(active) }) } }
+                    items(orders.filter { it.status != OrderStatus.TAKEN }, key = { it.id }) { order -> MyOrderCard(order = order, onComplete = { onCompleteOrder(order) }, onClick = { onOrderClick(order) }) }
+                }
+            }
         }
+        if (isRefreshing) { CircularProgressIndicator(modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)) }
     }
 }
 
