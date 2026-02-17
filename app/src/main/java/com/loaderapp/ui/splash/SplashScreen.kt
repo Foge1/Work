@@ -36,33 +36,23 @@ fun SplashScreen(onFinished: () -> Unit) {
     val pulseScale = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
-        // Иконка и текст появляются параллельно, плавно
-        launch {
-            iconAlpha.animateTo(1f, tween(450, easing = FastOutSlowInEasing))
-        }
+        launch { iconAlpha.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
         launch {
             iconScale.animateTo(
                 1f,
-                spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
             )
         }
-        // Текст чуть позже, но всё равно параллельно с иконкой
+        launch { delay(200); textAlpha.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
+        launch { delay(200); textOffsetY.animateTo(0f, tween(420, easing = FastOutSlowInEasing)) }
+        launch { delay(680); dotsAlpha.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+        // Пульс после появления
         launch {
-            delay(180)
-            textAlpha.animateTo(1f, tween(450, easing = FastOutSlowInEasing))
+            delay(1000)
+            pulseScale.animateTo(1.06f, tween(300, easing = FastOutSlowInEasing))
+            pulseScale.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
         }
-        launch {
-            delay(180)
-            textOffsetY.animateTo(0f, tween(450, easing = FastOutSlowInEasing))
-        }
-        // Точки появляются после того как всё загрузилось
-        launch {
-            delay(600)
-            dotsAlpha.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
-        }
-
-        // Ждём 1.8с, затем плавно исчезаем
-        delay(1800)
+        delay(2000)
         onFinished()
     }
 

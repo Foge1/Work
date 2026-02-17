@@ -60,5 +60,5 @@ fun LoaderAppTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composa
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
-    MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+    MaterialTheme(colorScheme = colorScheme, typography = Typography, shapes = AppShapes, content = content)
 }

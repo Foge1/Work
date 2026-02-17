@@ -352,6 +352,7 @@ fun OrdersContent(
 fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {}, workerCount: Int = 0) {
     val haptic = LocalHapticFeedback.current
     val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+    var showCancelConfirm by remember { mutableStateOf(false) }
     val accentColor = when (order.status) {
         OrderStatus.AVAILABLE -> MaterialTheme.colorScheme.primary
         OrderStatus.TAKEN, OrderStatus.IN_PROGRESS -> StatusOrange
@@ -360,7 +361,8 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
     }
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        elevation = CardDefaults.cardElevation(2.dp), shape = RoundedCornerShape(12.dp)
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = MaterialTheme.shapes.medium
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accentColor))
@@ -379,7 +381,7 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
                             com.loaderapp.ui.loader.WorkerProgressBadge(current = workerCount, required = order.requiredWorkers)
                         }
                         if (order.minWorkerRating > 0f) {
-                            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.extraSmall) {
                                 Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Star, null, tint = com.loaderapp.ui.theme.GoldStar, modifier = Modifier.size(12.dp))
                                     Text(" от ${order.minWorkerRating}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -394,14 +396,48 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
                 }
                 if (order.status == OrderStatus.AVAILABLE) {
                     OutlinedButton(
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onCancel(order) },
+                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCancelConfirm = true },
                         modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
+                        shape = MaterialTheme.shapes.small,
                         colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.error),
                         border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.error)
                     ) { Text("Отменить", fontWeight = FontWeight.Medium) }
                 }
             }
         }
+    }
+
+    // Диалог подтверждения отмены
+    if (showCancelConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCancelConfirm = false },
+            shape = MaterialTheme.shapes.extraLarge,
+            icon = {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = { Text("Отменить заказ?", fontWeight = FontWeight.SemiBold) },
+            text = {
+                Text(
+                    "Заказ «${order.address}» будет отменён. Это действие нельзя отменить.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showCancelConfirm = false; onCancel(order) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    shape = MaterialTheme.shapes.small
+                ) { Text("Отменить заказ") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelConfirm = false }) { Text("Назад") }
+            }
+        )
     }
 }
 

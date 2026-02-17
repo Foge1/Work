@@ -38,6 +38,7 @@ import com.loaderapp.data.model.OrderStatus
 import com.loaderapp.data.model.User
 import com.loaderapp.data.model.UserRole
 import com.loaderapp.data.repository.AppRepository
+import com.loaderapp.notification.NotificationHelper
 import com.loaderapp.ui.theme.GoldStar
 import com.loaderapp.ui.theme.StatusOrange
 import kotlinx.coroutines.launch
@@ -63,12 +64,25 @@ fun OrderDetailScreen(
     val dateFormat = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    val notificationHelper = remember { NotificationHelper(context) }
 
     // Chat state
     val messages by repository.getMessagesForOrder(order.id).collectAsState(initial = emptyList())
     var messageText by remember { mutableStateOf("") }
     val chatListState = rememberLazyListState()
     var chatExpanded by remember { mutableStateOf(false) }
+    var lastKnownMessageCount by remember { mutableIntStateOf(0) }
+
+    // Уведомление при новом входящем сообщении
+    LaunchedEffect(messages.size) {
+        if (messages.size > lastKnownMessageCount && lastKnownMessageCount > 0) {
+            val newest = messages.last()
+            if (newest.senderId != currentUser?.id) {
+                notificationHelper.sendChatMessageNotification(order.address, newest.senderName, newest.text)
+            }
+        }
+        lastKnownMessageCount = messages.size
+    }
 
     // Auto-scroll to bottom on new messages
     LaunchedEffect(messages.size) {

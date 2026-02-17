@@ -17,6 +17,7 @@ class NotificationHelper(private val context: Context) {
         private const val CHANNEL_NAME = "Заказы грузчиков"
         private const val CHANNEL_DESCRIPTION = "Уведомления о новых и изменённых заказах"
         private const val NEW_ORDER_NOTIFICATION_ID = 1
+        private const val CHAT_NOTIFICATION_ID = 3
     }
     
     init {
@@ -65,7 +66,28 @@ class NotificationHelper(private val context: Context) {
         }
     }
     
-    fun sendOrderTakenNotification(address: String, workerName: String) {
+    fun sendChatMessageNotification(orderAddress: String, senderName: String, messageText: String) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("💬 Новое сообщение от $senderName")
+            .setContentText("Заказ: $orderAddress\n$messageText")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Заказ «$orderAddress»\n$messageText"))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setVibrate(longArrayOf(0, 200, 100, 200))
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(CHAT_NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) { /* нет разрешения */ }
+    }
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }

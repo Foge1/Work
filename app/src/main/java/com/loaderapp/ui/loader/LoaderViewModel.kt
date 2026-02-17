@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class LoaderViewModel(
@@ -99,10 +100,18 @@ class LoaderViewModel(
     private fun loadMyOrders() {
         viewModelScope.launch {
             try {
-                repository.getOrdersByWorker(loaderId).collect { list ->
-                    val myList = list.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
-                    _myOrders.value = myList
-                    updateWorkerCounts(myList)
+                // Объединяем оба источника: прямой workerId (старые заказы) + order_workers (новые)
+                repository.getOrderIdsByWorker(loaderId).collect { workerOrderIds ->
+                    val directOrders = repository.getOrdersByWorker(loaderId).first()
+                    val directIds = directOrders.map { it.id }.toSet()
+                    val allIds = (directIds + workerOrderIds).toList()
+
+                    val allOrders = allIds.mapNotNull { repository.getOrderById(it) }
+                        .filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
+                        .sortedByDescending { it.dateTime }
+
+                    _myOrders.value = allOrders
+                    updateWorkerCounts(allOrders)
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Ошибка загрузки моих заказов: ${e.message}"

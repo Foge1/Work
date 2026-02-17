@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -73,9 +74,26 @@ fun MainScreen() {
     val context = LocalContext.current
     val app = remember(context) { context.applicationContext as LoaderApplication }
     var currentUser by remember { mutableStateOf<User?>(null) }
+    // rememberSaveable сохраняет ключ экрана при повороте/свёртывании
+    // OrderDetail не сохраняем (данные восстанавливаются из БД через ViewModel)
+    var screenKey by rememberSaveable { mutableStateOf("splash") }
     var screen by remember { mutableStateOf<AppScreen>(AppScreen.Splash) }
     val scope = rememberCoroutineScope()
     val isDarkTheme by app.userPreferences.isDarkTheme.collectAsState(initial = false)
+
+    // Синхронизируем screenKey → screen при восстановлении после ротации
+    LaunchedEffect(screenKey, currentUser) {
+        if (screenKey != "splash" && screenKey != "auth" && screenKey != "order_detail") {
+            val user = currentUser
+            if (user != null) {
+                screen = when {
+                    screenKey == "dispatcher" && user.role == UserRole.DISPATCHER -> AppScreen.Dispatcher(user)
+                    screenKey == "loader" && user.role == UserRole.LOADER -> AppScreen.Loader(user)
+                    else -> screen
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         app.userPreferences.currentUserId.collect { userId ->
@@ -87,6 +105,7 @@ fun MainScreen() {
         scope.launch {
             app.userPreferences.clearCurrentUser()
             currentUser = null
+            screenKey = "auth"
             screen = AppScreen.Auth
         }
     }
@@ -97,25 +116,21 @@ fun MainScreen() {
                 targetState = screen,
                 transitionSpec = {
                     when {
-                        // Splash → что угодно: плавное растворение
                         initialState is AppScreen.Splash ->
-                            fadeIn(tween(400, easing = FastOutSlowInEasing)) togetherWith
-                            fadeOut(tween(300))
+                            fadeIn(tween(500, easing = FastOutSlowInEasing)) togetherWith
+                            fadeOut(tween(350))
 
-                        // Переход на детали заказа: слайд снизу вверх
                         targetState is AppScreen.OrderDetail ->
-                            (fadeIn(tween(280)) + slideInVertically(tween(320, easing = FastOutSlowInEasing)) { it / 6 }) togetherWith
+                            (fadeIn(tween(280)) + slideInVertically(tween(340, easing = FastOutSlowInEasing)) { it / 5 }) togetherWith
                             fadeOut(tween(180))
 
-                        // Назад с деталей: слайд вниз
                         initialState is AppScreen.OrderDetail ->
-                            fadeIn(tween(220)) togetherWith
-                            (fadeOut(tween(200)) + slideOutVertically(tween(260, easing = FastOutSlowInEasing)) { it / 6 })
+                            fadeIn(tween(240)) togetherWith
+                            (fadeOut(tween(200)) + slideOutVertically(tween(280, easing = FastOutSlowInEasing)) { it / 5 })
 
-                        // Auth → главный экран: слайд слева
                         initialState is AppScreen.Auth ->
-                            (fadeIn(tween(350)) + slideInHorizontally(tween(380, easing = FastOutSlowInEasing)) { it / 5 }) togetherWith
-                            fadeOut(tween(200))
+                            (fadeIn(tween(400)) + slideInHorizontally(tween(420, easing = FastOutSlowInEasing)) { it / 5 }) togetherWith
+                            fadeOut(tween(220))
 
                         else ->
                             fadeIn(tween(300)) togetherWith fadeOut(tween(200))
@@ -125,12 +140,13 @@ fun MainScreen() {
             ) { s ->
                 when (s) {
                     is AppScreen.Splash -> SplashScreen(onFinished = {
-                        screen = if (currentUser != null) {
+                        val dest = if (currentUser != null) {
                             when (currentUser!!.role) {
-                                UserRole.DISPATCHER -> AppScreen.Dispatcher(currentUser!!)
-                                UserRole.LOADER -> AppScreen.Loader(currentUser!!)
+                                UserRole.DISPATCHER -> { screenKey = "dispatcher"; AppScreen.Dispatcher(currentUser!!) }
+                                UserRole.LOADER -> { screenKey = "loader"; AppScreen.Loader(currentUser!!) }
                             }
-                        } else AppScreen.Auth
+                        } else { screenKey = "auth"; AppScreen.Auth }
+                        screen = dest
                     })
 
                     is AppScreen.Auth -> RoleSelectionScreen(onUserCreated = { newUser ->
@@ -140,8 +156,8 @@ fun MainScreen() {
                             val saved = newUser.copy(id = userId)
                             currentUser = saved
                             screen = when (saved.role) {
-                                UserRole.DISPATCHER -> AppScreen.Dispatcher(saved)
-                                UserRole.LOADER -> AppScreen.Loader(saved)
+                                UserRole.DISPATCHER -> { screenKey = "dispatcher"; AppScreen.Dispatcher(saved) }
+                                UserRole.LOADER -> { screenKey = "loader"; AppScreen.Loader(saved) }
                             }
                         }
                     })
@@ -156,6 +172,7 @@ fun MainScreen() {
                             onSwitchRole = { switchRole() },
                             onDarkThemeChanged = { enabled -> scope.launch { app.userPreferences.setDarkTheme(enabled) } },
                             onOrderClick = { order, dispatcher, worker ->
+                                screenKey = "order_detail"
                                 screen = AppScreen.OrderDetail(
                                     order = order,
                                     dispatcher = dispatcher,
@@ -164,7 +181,11 @@ fun MainScreen() {
                                     workerCount = viewModel.workerCounts.value[order.id] ?: 0,
                                     onTake = null,
                                     onComplete = null,
-                                    onCancel = { o -> viewModel.cancelOrder(o); screen = AppScreen.Dispatcher(s.user) }
+                                    onCancel = { o ->
+                                        viewModel.cancelOrder(o)
+                                        screenKey = "dispatcher"
+                                        screen = AppScreen.Dispatcher(s.user)
+                                    }
                                 )
                             }
                         )
@@ -180,6 +201,7 @@ fun MainScreen() {
                             onSwitchRole = { switchRole() },
                             onDarkThemeChanged = { enabled -> scope.launch { app.userPreferences.setDarkTheme(enabled) } },
                             onOrderClick = { order, dispatcher, worker ->
+                                screenKey = "order_detail"
                                 screen = AppScreen.OrderDetail(
                                     order = order,
                                     dispatcher = dispatcher,
@@ -188,10 +210,12 @@ fun MainScreen() {
                                     workerCount = viewModel.workerCounts.value[order.id] ?: 0,
                                     onTake = { o ->
                                         viewModel.takeOrder(o)
+                                        screenKey = "loader"
                                         screen = AppScreen.Loader(s.user)
                                     },
                                     onComplete = { o ->
                                         viewModel.completeOrder(o)
+                                        screenKey = "loader"
                                         screen = AppScreen.Loader(s.user)
                                     },
                                     onCancel = null
