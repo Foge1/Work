@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class DispatcherDestination { ORDERS, SETTINGS, RATING, HISTORY }
+enum class DispatcherDestination { ORDERS, SETTINGS, RATING, HISTORY, PROFILE }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +55,9 @@ fun DispatcherScreen(
     val isSearchActive by viewModel.isSearchActive.collectAsState()
     val completedCount by viewModel.completedCount.collectAsState(initial = 0)
     val activeCount by viewModel.activeCount.collectAsState(initial = 0)
+
+    val snackbarMessage by viewModel.snackbarMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showSwitchDialog by remember { mutableStateOf(false) }
@@ -114,6 +117,7 @@ fun DispatcherScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 DrawerItem("Заказы", currentDestination == DispatcherDestination.ORDERS, badge = availableCount) { currentDestination = DispatcherDestination.ORDERS; scope.launch { drawerState.close() } }
+                DrawerItem("Профиль", currentDestination == DispatcherDestination.PROFILE) { currentDestination = DispatcherDestination.PROFILE; scope.launch { drawerState.close() } }
                 DrawerItem("Рейтинг", currentDestination == DispatcherDestination.RATING) { currentDestination = DispatcherDestination.RATING; scope.launch { drawerState.close() } }
                 DrawerItem("История", currentDestination == DispatcherDestination.HISTORY) { currentDestination = DispatcherDestination.HISTORY; scope.launch { drawerState.close() } }
                 DrawerItem("Настройки", currentDestination == DispatcherDestination.SETTINGS) { currentDestination = DispatcherDestination.SETTINGS; scope.launch { drawerState.close() } }
@@ -128,6 +132,20 @@ fun DispatcherScreen(
                 DispatcherDestination.SETTINGS -> SettingsScreen(onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = DispatcherDestination.ORDERS }, onDarkThemeChanged = onDarkThemeChanged)
                 DispatcherDestination.RATING -> RatingScreen(userName = userName, userRating = 5.0, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = DispatcherDestination.ORDERS }, dispatcherCompletedCount = completedCount, dispatcherActiveCount = activeCount, isDispatcher = true)
                 DispatcherDestination.HISTORY -> HistoryScreen(orders = orders, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = DispatcherDestination.ORDERS })
+                DispatcherDestination.PROFILE -> {
+                    val currentUser by viewModel.currentUser.collectAsState()
+                    val completedCnt by viewModel.completedCount.collectAsState(initial = 0)
+                    val activeCnt by viewModel.activeCount.collectAsState(initial = 0)
+                    currentUser?.let { user ->
+                        com.loaderapp.ui.profile.ProfileScreen(
+                            user = user,
+                            dispatcherCompletedCount = completedCnt,
+                            dispatcherActiveCount = activeCnt,
+                            onMenuClick = { scope.launch { drawerState.open() } },
+                            onSaveProfile = { name, phone, birthDate -> viewModel.saveProfile(name, phone, birthDate) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -141,6 +159,12 @@ fun DispatcherScreen(
             dismissButton = { TextButton(onClick = { showSwitchDialog = false }) { Text("Отмена") } })
     }
     errorMessage?.let { LaunchedEffect(it) { viewModel.clearError() } }
+    snackbarMessage?.let { msg ->
+        LaunchedEffect(msg) {
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+            viewModel.clearSnackbar()
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

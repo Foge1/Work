@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.loaderapp.data.model.Order
 import com.loaderapp.data.model.OrderStatus
 import com.loaderapp.ui.history.HistoryScreen
+import com.loaderapp.ui.profile.ProfileScreen
 import com.loaderapp.ui.rating.RatingScreen
 import com.loaderapp.ui.settings.SettingsScreen
 import com.loaderapp.ui.theme.GoldStar
@@ -38,7 +39,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class LoaderDestination { ORDERS, SETTINGS, RATING, HISTORY }
+enum class LoaderDestination { ORDERS, SETTINGS, RATING, HISTORY, PROFILE }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +56,9 @@ fun LoaderScreen(
     val completedCount by viewModel.completedCount.collectAsState(initial = 0)
     val totalEarnings by viewModel.totalEarnings.collectAsState(initial = null)
     val averageRating by viewModel.averageRating.collectAsState(initial = null)
+    val snackbarMessage by viewModel.snackbarMessage.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var selectedTab by remember { mutableStateOf(0) }
     var showSwitchDialog by remember { mutableStateOf(false) }
@@ -117,6 +121,7 @@ fun LoaderScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 DrawerItem("Заказы", currentDestination == LoaderDestination.ORDERS, badge = availableOrders.size) { currentDestination = LoaderDestination.ORDERS; scope.launch { drawerState.close() } }
+                DrawerItem("Профиль", currentDestination == LoaderDestination.PROFILE) { currentDestination = LoaderDestination.PROFILE; scope.launch { drawerState.close() } }
                 DrawerItem("Рейтинг", currentDestination == LoaderDestination.RATING) { currentDestination = LoaderDestination.RATING; scope.launch { drawerState.close() } }
                 DrawerItem("История", currentDestination == LoaderDestination.HISTORY) { currentDestination = LoaderDestination.HISTORY; scope.launch { drawerState.close() } }
                 DrawerItem("Настройки", currentDestination == LoaderDestination.SETTINGS) { currentDestination = LoaderDestination.SETTINGS; scope.launch { drawerState.close() } }
@@ -131,12 +136,31 @@ fun LoaderScreen(
                 LoaderDestination.SETTINGS -> SettingsScreen(onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = LoaderDestination.ORDERS }, onDarkThemeChanged = onDarkThemeChanged)
                 LoaderDestination.RATING -> RatingScreen(userName = userName, userRating = averageRating?.toDouble() ?: 5.0, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = LoaderDestination.ORDERS }, completedCount = completedCount, totalEarnings = totalEarnings ?: 0.0, averageRating = averageRating ?: 0f, isDispatcher = false)
                 LoaderDestination.HISTORY -> HistoryScreen(orders = myOrders, onMenuClick = { scope.launch { drawerState.open() } }, onBackClick = { currentDestination = LoaderDestination.ORDERS })
+                LoaderDestination.PROFILE -> {
+                    currentUser?.let { user ->
+                        ProfileScreen(
+                            user = user,
+                            completedCount = completedCount,
+                            totalEarnings = totalEarnings ?: 0.0,
+                            averageRating = averageRating ?: 0f,
+                            onMenuClick = { scope.launch { drawerState.open() } },
+                            onSaveProfile = { name, phone, birthDate -> viewModel.saveProfile(name, phone, birthDate) }
+                        )
+                    }
+                }
             }
         }
     }
 
     orderToTake?.let { order -> TakeOrderBottomSheet(order = order, onDismiss = { orderToTake = null }, onConfirm = { viewModel.takeOrder(order); orderToTake = null }) }
     showRatingDialog?.let { order -> RateOrderDialog(onDismiss = { showRatingDialog = null }, onRate = { rating -> viewModel.rateOrder(order.id, rating); showRatingDialog = null }) }
+
+    snackbarMessage?.let { msg ->
+        LaunchedEffect(msg) {
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+            viewModel.clearSnackbar()
+        }
+    }
 
     if (showSwitchDialog) {
         AlertDialog(onDismissRequest = { showSwitchDialog = false }, title = { Text("Сменить роль?") }, text = { Text("Вы хотите выйти из режима грузчика?") },

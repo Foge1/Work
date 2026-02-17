@@ -10,11 +10,10 @@ data class User(
     val name: String,
     val phone: String,
     val role: UserRole,
-    val rating: Double = 5.0, // рейтинг для грузчиков
+    val rating: Double = 5.0,
+    val birthDate: Long? = null, // timestamp дня рождения
+    val avatarInitials: String = "", // инициалы для аватара (авто)
     val createdAt: Long = System.currentTimeMillis()
 )
 
-enum class UserRole {
-    DISPATCHER,
-    LOADER
-}
+enum class UserRole { DISPATCHER, LOADER }
