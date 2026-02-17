@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
@@ -304,6 +306,16 @@ fun LoaderOrdersContent(
     workerCounts: Map<Long, Int> = emptyMap()
 ) {
     val activeOrderCount = myOrders.count { it.status == OrderStatus.TAKEN }
+    val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 2 })
+    val scope = rememberCoroutineScope()
+
+    // Синхронизация pager ↔ selectedTab
+    LaunchedEffect(selectedTab) {
+        if (pagerState.currentPage != selectedTab) pagerState.animateScrollToPage(selectedTab)
+    }
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage != selectedTab) onTabSelected(pagerState.currentPage)
+    }
 
     Scaffold(
         topBar = {
@@ -320,14 +332,14 @@ fun LoaderOrdersContent(
                         }
                     }
                 )
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(selected = selectedTab == 0, onClick = { onTabSelected(0) }, text = {
+                TabRow(selectedTabIndex = pagerState.currentPage) {
+                    Tab(selected = pagerState.currentPage == 0, onClick = { scope.launch { pagerState.animateScrollToPage(0) } }, text = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Доступные")
                             if (availableOrders.isNotEmpty()) Badge(containerColor = MaterialTheme.colorScheme.primary) { Text("${availableOrders.size}", fontSize = 10.sp, color = Color.White) }
                         }
                     })
-                    Tab(selected = selectedTab == 1, onClick = { onTabSelected(1) }, text = {
+                    Tab(selected = pagerState.currentPage == 1, onClick = { scope.launch { pagerState.animateScrollToPage(1) } }, text = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Мои заказы")
                             if (activeOrderCount > 0) Badge(containerColor = StatusOrange) { Text("$activeOrderCount", fontSize = 10.sp, color = Color.White) }
@@ -337,12 +349,18 @@ fun LoaderOrdersContent(
             }
         }
     ) { padding ->
+        val pullRefreshState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            val pullRefreshState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
             Box(modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
-                when (selectedTab) {
-                    0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, isRefreshing = isRefreshing, onTakeOrder = onTakeOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)
-                    1 -> MyOrdersList(orders = myOrders, isLoading = isLoading, isRefreshing = isRefreshing, activeOrder = activeOrder, onCompleteOrder = onCompleteOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    beyondViewportPageCount = 1
+                ) { page ->
+                    when (page) {
+                        0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, isRefreshing = isRefreshing, onTakeOrder = onTakeOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)
+                        1 -> MyOrdersList(orders = myOrders, isLoading = isLoading, isRefreshing = isRefreshing, activeOrder = activeOrder, onCompleteOrder = onCompleteOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)
+                    }
                 }
                 PullRefreshIndicator(
                     refreshing = isRefreshing, state = pullRefreshState,

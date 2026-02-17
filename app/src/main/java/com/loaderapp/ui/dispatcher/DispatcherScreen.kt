@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -43,7 +45,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class DispatcherDestination { ORDERS, SETTINGS, RATING, HISTORY, PROFILE }
+enum class DispatcherDestination { ORDERS, SETTINGS, RATING, HISTORY, PROFILE, CREATE }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -66,7 +68,6 @@ fun DispatcherScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val workerCounts by viewModel.workerCounts.collectAsState()
 
-    var showCreateDialog by remember { mutableStateOf(false) }
     var showSwitchDialog by remember { mutableStateOf(false) }
     var currentDestination by remember { mutableStateOf(DispatcherDestination.ORDERS) }
     var selectedTab by remember { mutableStateOf(0) }
@@ -147,7 +148,7 @@ fun DispatcherScreen(
                     searchQuery = searchQuery, isSearchActive = isSearchActive,
                     onTabSelected = { selectedTab = it },
                     onMenuClick = { scope.launch { drawerState.open() } },
-                    onCreateOrder = { showCreateDialog = true },
+                    onCreateOrder = { currentDestination = DispatcherDestination.CREATE },
                     onCancelOrder = { viewModel.cancelOrder(it) },
                     onSearchQueryChange = { viewModel.setSearchQuery(it) },
                     onSearchToggle = { viewModel.setSearchActive(it) },
@@ -160,6 +161,13 @@ fun DispatcherScreen(
                     },
                     onRefresh = { viewModel.refresh() },
                     workerCounts = workerCounts
+                )
+                DispatcherDestination.CREATE -> CreateOrderScreen(
+                    onBack = { currentDestination = DispatcherDestination.ORDERS },
+                    onCreate = { address, dateTime, cargo, price, hours, comment, requiredWorkers, minRating ->
+                        viewModel.createOrder(address, dateTime, cargo, price, hours, comment, requiredWorkers, minRating)
+                        currentDestination = DispatcherDestination.ORDERS
+                    }
                 )
                 DispatcherDestination.SETTINGS -> SettingsScreen(
                     onMenuClick = { scope.launch { drawerState.open() } },
@@ -195,15 +203,6 @@ fun DispatcherScreen(
         }
     }
 
-    if (showCreateDialog) {
-        CreateOrderDialog(
-            onDismiss = { showCreateDialog = false },
-            onCreate = { address, dateTime, cargo, price, hours, comment, requiredWorkers, minRating ->
-                viewModel.createOrder(address, dateTime, cargo, price, hours, comment, requiredWorkers, minRating)
-                showCreateDialog = false
-            }
-        )
-    }
     if (showSwitchDialog) {
         AlertDialog(
             onDismissRequest = { showSwitchDialog = false },
@@ -236,11 +235,17 @@ fun OrdersContent(
     val availableOrders = orders.filter { it.status == OrderStatus.AVAILABLE }
     val takenOrders = orders.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
     val focusRequester = remember { FocusRequester() }
+    val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 2 })
+    val scope = rememberCoroutineScope()
+    val pullRefreshState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
 
-    val pullRefreshState = rememberPullRefreshState(
-        refreshing = isRefreshing,
-        onRefresh = onRefresh
-    )
+    // Синхронизация pager ↔ selectedTab
+    LaunchedEffect(selectedTab) {
+        if (pagerState.currentPage != selectedTab) pagerState.animateScrollToPage(selectedTab)
+    }
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage != selectedTab) onTabSelected(pagerState.currentPage)
+    }
 
     Scaffold(
         topBar = {
@@ -280,14 +285,14 @@ fun OrdersContent(
                         else if (searchQuery.isNotEmpty()) IconButton(onClick = { onSearchQueryChange("") }) { Icon(Icons.Default.Clear, "Очистить") }
                     }
                 )
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(selected = selectedTab == 0, onClick = { onTabSelected(0) }, text = {
+                TabRow(selectedTabIndex = pagerState.currentPage) {
+                    Tab(selected = pagerState.currentPage == 0, onClick = { scope.launch { pagerState.animateScrollToPage(0) } }, text = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Свободные")
                             if (availableCount > 0) Badge(containerColor = MaterialTheme.colorScheme.primary) { Text("$availableCount", fontSize = 10.sp, color = Color.White) }
                         }
                     })
-                    Tab(selected = selectedTab == 1, onClick = { onTabSelected(1) }, text = {
+                    Tab(selected = pagerState.currentPage == 1, onClick = { scope.launch { pagerState.animateScrollToPage(1) } }, text = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("В работе")
                             if (takenCount > 0) Badge(containerColor = StatusOrange) { Text("$takenCount", fontSize = 10.sp, color = Color.White) }
@@ -305,42 +310,40 @@ fun OrdersContent(
             )
         }
     ) { padding ->
-        val currentOrders = if (selectedTab == 0) availableOrders else takenOrders
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .pullRefresh(pullRefreshState)
-        ) {
-            when {
-                isLoading && !isRefreshing -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(4) { SkeletonCard() }
-                }
-                currentOrders.isEmpty() -> {
-                    val icon = if (selectedTab == 0) Icons.Default.Inbox else Icons.Default.Assignment
-                    val title = if (selectedTab == 0) { if (isSearchActive && searchQuery.isNotEmpty()) "Заказы не найдены" else "Нет свободных заказов" } else "Нет заказов в работе"
-                    val subtitle = if (selectedTab == 0) { if (isSearchActive && searchQuery.isNotEmpty()) "Попробуйте другой запрос" else "Создайте первый заказ" } else "Свободные заказы появятся здесь"
-                    EmptyState(icon = icon, title = title, subtitle = subtitle)
-                }
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    itemsIndexed(currentOrders, key = { _, it -> it.id }) { index, order ->
-                        var visible by remember { mutableStateOf(false) }
-                        LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 50L); visible = true }
-                        AnimatedVisibility(visible, enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 4 }) {
-                            OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) }, workerCount = workerCounts[order.id] ?: 0)
+        Box(modifier = Modifier.fillMaxSize().padding(padding).pullRefresh(pullRefreshState)) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                beyondViewportPageCount = 1
+            ) { page ->
+                val currentOrders = if (page == 0) availableOrders else takenOrders
+                when {
+                    isLoading && !isRefreshing -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(4) { SkeletonCard() }
+                    }
+                    currentOrders.isEmpty() -> {
+                        val icon = if (page == 0) Icons.Default.Inbox else Icons.Default.Assignment
+                        val title = if (page == 0) { if (isSearchActive && searchQuery.isNotEmpty()) "Заказы не найдены" else "Нет свободных заказов" } else "Нет заказов в работе"
+                        val subtitle = if (page == 0) { if (isSearchActive && searchQuery.isNotEmpty()) "Попробуйте другой запрос" else "Создайте первый заказ" } else "Свободные заказы появятся здесь"
+                        EmptyState(icon = icon, title = title, subtitle = subtitle)
+                    }
+                    else -> LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        itemsIndexed(currentOrders, key = { _, it -> it.id }) { index, order ->
+                            var visible by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 50L); visible = true }
+                            AnimatedVisibility(visible, enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 4 }) {
+                                OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) }, workerCount = workerCounts[order.id] ?: 0)
+                            }
                         }
                     }
                 }
             }
-
             PullRefreshIndicator(
-                refreshing = isRefreshing,
-                state = pullRefreshState,
+                refreshing = isRefreshing, state = pullRefreshState,
                 modifier = Modifier.align(Alignment.TopCenter),
                 contentColor = MaterialTheme.colorScheme.primary
             )

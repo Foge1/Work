@@ -11,8 +11,6 @@ import com.loaderapp.notification.NotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class LoaderViewModel(
@@ -98,25 +96,38 @@ class LoaderViewModel(
     }
 
     private fun loadMyOrders() {
+        // Источник 1: заказы где workerId = loaderId (реагирует на изменения статуса)
         viewModelScope.launch {
             try {
-                // Объединяем оба источника: прямой workerId (старые заказы) + order_workers (новые)
-                repository.getOrderIdsByWorker(loaderId).collect { workerOrderIds ->
-                    val directOrders = repository.getOrdersByWorker(loaderId).first()
-                    val directIds = directOrders.map { it.id }.toSet()
-                    val allIds = (directIds + workerOrderIds).toList()
-
-                    val allOrders = allIds.mapNotNull { repository.getOrderById(it) }
-                        .filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
-                        .sortedByDescending { it.dateTime }
-
-                    _myOrders.value = allOrders
-                    updateWorkerCounts(allOrders)
+                repository.getOrdersByWorker(loaderId).collect { directOrders ->
+                    mergeMyOrders(directOrders)
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Ошибка загрузки моих заказов: ${e.message}"
             }
         }
+        // Источник 2: junction-таблица order_workers (для мультигрузчиков)
+        viewModelScope.launch {
+            try {
+                repository.getOrderIdsByWorker(loaderId).collect { workerOrderIds ->
+                    val directOrders = _myOrders.value
+                    val directIds = directOrders.map { it.id }.toSet()
+                    val extraIds = workerOrderIds.filter { it !in directIds }
+                    val extraOrders = extraIds.mapNotNull { repository.getOrderById(it) }
+                    mergeMyOrders(directOrders + extraOrders)
+                }
+            } catch (e: Exception) {
+                // не критично — основной источник выше
+            }
+        }
+    }
+
+    private suspend fun mergeMyOrders(orders: List<Order>) {
+        val result = orders
+            .filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
+            .sortedByDescending { it.dateTime }
+        _myOrders.value = result
+        updateWorkerCounts(result)
     }
 
     private suspend fun updateWorkerCounts(orders: List<Order>) {
