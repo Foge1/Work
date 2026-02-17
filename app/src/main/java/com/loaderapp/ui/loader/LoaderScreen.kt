@@ -354,8 +354,7 @@ fun LoaderOrdersContent(
             Box(modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize(),
-                    beyondViewportPageCount = 1
+                    modifier = Modifier.fillMaxSize()
                 ) { page ->
                     when (page) {
                         0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, isRefreshing = isRefreshing, onTakeOrder = onTakeOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)

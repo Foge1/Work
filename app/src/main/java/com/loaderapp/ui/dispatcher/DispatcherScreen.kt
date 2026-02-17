@@ -313,8 +313,7 @@ fun OrdersContent(
         Box(modifier = Modifier.fillMaxSize().padding(padding).pullRefresh(pullRefreshState)) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                beyondViewportPageCount = 1
+                modifier = Modifier.fillMaxSize()
             ) { page ->
                 val currentOrders = if (page == 0) availableOrders else takenOrders
                 when {
