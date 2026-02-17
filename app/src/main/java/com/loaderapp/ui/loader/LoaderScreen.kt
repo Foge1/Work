@@ -84,7 +84,7 @@ fun LoaderScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = drawerState.currentValue == DrawerValue.Open,
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -364,7 +364,7 @@ fun LoaderOrdersContent(
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
-                    userScrollEnabled = drawerState?.isClosed ?: true
+                    userScrollEnabled = drawerState?.let { !it.isOpen } ?: true
                 ) { page ->
                     when (page) {
                         0 -> AvailableOrdersList(orders = availableOrders, isLoading = isLoading, isRefreshing = isRefreshing, onTakeOrder = onTakeOrder, onOrderClick = onOrderClick, workerCounts = workerCounts)

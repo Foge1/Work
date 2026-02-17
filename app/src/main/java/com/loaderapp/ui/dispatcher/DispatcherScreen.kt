@@ -80,7 +80,7 @@ fun DispatcherScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = drawerState.currentValue == DrawerValue.Open,
+        gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.width(240.dp),
@@ -323,7 +323,7 @@ fun OrdersContent(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = drawerState?.isClosed ?: true
+                userScrollEnabled = drawerState?.let { !it.isOpen } ?: true
             ) { page ->
                 val currentOrders = if (page == 0) availableOrders else takenOrders
                 when {
