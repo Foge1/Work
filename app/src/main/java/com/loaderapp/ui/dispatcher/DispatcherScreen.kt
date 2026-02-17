@@ -24,17 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loaderapp.data.model.Order
@@ -85,7 +80,7 @@ fun DispatcherScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = true,
+        gesturesEnabled = drawerState.currentValue == DrawerValue.Open,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.width(240.dp),
@@ -251,29 +246,6 @@ fun OrdersContent(
     val scope = rememberCoroutineScope()
     val pullRefreshState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
 
-    val drawerNestedScroll = remember(drawerState, pagerState) {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.x < 0 && drawerState?.currentValue == DrawerValue.Open) {
-                    scope.launch { drawerState?.close() }
-                    return available
-                }
-                return Offset.Zero
-            }
-
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (available.x > 0 && pagerState.currentPage == 0 && drawerState?.currentValue == DrawerValue.Closed) {
-                    scope.launch { drawerState?.open() }
-                }
-                return Offset.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                return Velocity.Zero
-            }
-        }
-    }
-
     // Синхронизация pager ↔ selectedTab
     LaunchedEffect(selectedTab) {
         if (pagerState.currentPage != selectedTab) pagerState.animateScrollToPage(selectedTab)
@@ -350,7 +322,8 @@ fun OrdersContent(
         Box(modifier = Modifier.fillMaxSize().padding(padding).pullRefresh(pullRefreshState)) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize().nestedScroll(drawerNestedScroll),
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = drawerState?.isClosed ?: true
             ) { page ->
                 val currentOrders = if (page == 0) availableOrders else takenOrders
                 when {
