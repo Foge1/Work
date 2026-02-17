@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.sp
 import com.loaderapp.data.model.Order
 import com.loaderapp.data.model.OrderStatus
 import com.loaderapp.data.model.User
+import com.loaderapp.ui.components.AppBottomBar
+import com.loaderapp.ui.components.BottomNavItem
 import com.loaderapp.ui.history.HistoryScreen
 import com.loaderapp.ui.loader.EmptyState
 import com.loaderapp.ui.loader.SkeletonCard
@@ -89,11 +91,18 @@ fun DispatcherScreen(
     }
 
     val navItems = listOf(
-        Triple(DispatcherDestination.ORDERS, Icons.Default.Assignment, "Заказы"),
-        Triple(DispatcherDestination.HISTORY, Icons.Default.History, "История"),
-        Triple(DispatcherDestination.RATING, Icons.Default.Star, "Рейтинг"),
-        Triple(DispatcherDestination.PROFILE, Icons.Default.Person, "Профиль"),
-        Triple(DispatcherDestination.SETTINGS, Icons.Default.Settings, "Настройки")
+        BottomNavItem(Icons.Default.Assignment, "Заказы", availableCount),
+        BottomNavItem(Icons.Default.History, "История"),
+        BottomNavItem(Icons.Default.Star, "Рейтинг"),
+        BottomNavItem(Icons.Default.Person, "Профиль"),
+        BottomNavItem(Icons.Default.Settings, "Настройки")
+    )
+    val destinations = listOf(
+        DispatcherDestination.ORDERS,
+        DispatcherDestination.HISTORY,
+        DispatcherDestination.RATING,
+        DispatcherDestination.PROFILE,
+        DispatcherDestination.SETTINGS
     )
 
     // CREATE не показывает BottomBar
@@ -103,40 +112,11 @@ fun DispatcherScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(
-                    tonalElevation = 0.dp,
-                    containerColor = MaterialTheme.colorScheme.surface
-                ) {
-                    navItems.forEach { (dest, icon, label) ->
-                        val selected = currentDestination == dest
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = { currentDestination = dest },
-                            icon = {
-                                BadgedBox(
-                                    badge = {
-                                        if (dest == DispatcherDestination.ORDERS && availableCount > 0) {
-                                            Badge { Text("$availableCount") }
-                                        }
-                                    }
-                                ) {
-                                    Icon(icon, contentDescription = label)
-                                }
-                            },
-                            label = { Text(label, fontSize = 11.sp) },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        )
-                    }
-                    // Сменить роль — последний пункт
-                    NavigationBarItem(
-                        selected = false,
-                        onClick = { showSwitchDialog = true },
-                        icon = { Icon(Icons.Default.SyncAlt, contentDescription = "Сменить роль") },
-                        label = { Text("Роль", fontSize = 11.sp) }
-                    )
-                }
+                AppBottomBar(
+                    items = navItems,
+                    selectedIndex = destinations.indexOf(currentDestination).coerceAtLeast(0),
+                    onItemSelected = { index -> currentDestination = destinations[index] }
+                )
             }
         }
     ) { paddingValues ->
@@ -181,7 +161,8 @@ fun DispatcherScreen(
                 DispatcherDestination.SETTINGS -> SettingsScreen(
                     onMenuClick = { /* нет drawer */ },
                     onBackClick = { currentDestination = DispatcherDestination.ORDERS },
-                    onDarkThemeChanged = onDarkThemeChanged
+                    onDarkThemeChanged = onDarkThemeChanged,
+                    onSwitchRole = { showSwitchDialog = true }
                 )
                 DispatcherDestination.RATING -> RatingScreen(
                     userName = userName, userRating = 5.0,

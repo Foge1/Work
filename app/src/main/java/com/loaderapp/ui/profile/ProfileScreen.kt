@@ -325,7 +325,7 @@ private fun ProfileInfoRow(icon: ImageVector, label: String, value: String) {
 
 @Composable
 private fun MiniStatCard(modifier: Modifier, value: String, label: String, icon: ImageVector, color: Color) {
-    Card(modifier = modifier, elevation = CardDefaults.cardElevation(1.dp), shape = RoundedCornerShape(12.dp)) {
+    Card(modifier = modifier, elevation = CardDefaults.cardElevation(0.dp), shape = RoundedCornerShape(12.dp)) {
         Column(modifier = Modifier.padding(14.dp)) {
             Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.height(6.dp))

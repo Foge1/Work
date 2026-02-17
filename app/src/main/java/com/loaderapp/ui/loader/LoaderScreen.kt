@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import com.loaderapp.data.model.Order
 import com.loaderapp.data.model.OrderStatus
 import com.loaderapp.data.model.User
+import com.loaderapp.ui.components.AppBottomBar
+import com.loaderapp.ui.components.BottomNavItem
 import com.loaderapp.ui.history.HistoryScreen
 import com.loaderapp.ui.profile.ProfileScreen
 import com.loaderapp.ui.rating.RatingScreen
@@ -89,49 +91,28 @@ fun LoaderScreen(
     }
 
     val navItems = listOf(
-        Triple(LoaderDestination.ORDERS, Icons.Default.Assignment, "Заказы"),
-        Triple(LoaderDestination.HISTORY, Icons.Default.History, "История"),
-        Triple(LoaderDestination.RATING, Icons.Default.Star, "Рейтинг"),
-        Triple(LoaderDestination.PROFILE, Icons.Default.Person, "Профиль"),
-        Triple(LoaderDestination.SETTINGS, Icons.Default.Settings, "Настройки")
+        BottomNavItem(Icons.Default.Assignment, "Заказы", availableOrders.size),
+        BottomNavItem(Icons.Default.History, "История"),
+        BottomNavItem(Icons.Default.Star, "Рейтинг"),
+        BottomNavItem(Icons.Default.Person, "Профиль"),
+        BottomNavItem(Icons.Default.Settings, "Настройки")
+    )
+    val destinations = listOf(
+        LoaderDestination.ORDERS,
+        LoaderDestination.HISTORY,
+        LoaderDestination.RATING,
+        LoaderDestination.PROFILE,
+        LoaderDestination.SETTINGS
     )
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            NavigationBar(
-                tonalElevation = 0.dp,
-                containerColor = MaterialTheme.colorScheme.surface
-            ) {
-                navItems.forEach { (dest, icon, label) ->
-                    val selected = currentDestination == dest
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = { currentDestination = dest },
-                        icon = {
-                            BadgedBox(
-                                badge = {
-                                    if (dest == LoaderDestination.ORDERS && availableOrders.isNotEmpty()) {
-                                        Badge { Text("${availableOrders.size}") }
-                                    }
-                                }
-                            ) {
-                                Icon(icon, contentDescription = label)
-                            }
-                        },
-                        label = { Text(label, fontSize = 11.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    )
-                }
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { showSwitchDialog = true },
-                    icon = { Icon(Icons.Default.SyncAlt, contentDescription = "Сменить роль") },
-                    label = { Text("Роль", fontSize = 11.sp) }
-                )
-            }
+            AppBottomBar(
+                items = navItems,
+                selectedIndex = destinations.indexOf(currentDestination).coerceAtLeast(0),
+                onItemSelected = { index -> currentDestination = destinations[index] }
+            )
         }
     ) { paddingValues ->
         AnimatedContent(
@@ -165,7 +146,8 @@ fun LoaderScreen(
                 LoaderDestination.SETTINGS -> SettingsScreen(
                     onMenuClick = { /* нет drawer */ },
                     onBackClick = { currentDestination = LoaderDestination.ORDERS },
-                    onDarkThemeChanged = onDarkThemeChanged
+                    onDarkThemeChanged = onDarkThemeChanged,
+                    onSwitchRole = { showSwitchDialog = true }
                 )
                 LoaderDestination.RATING -> RatingScreen(
                     userName = userName, userRating = averageRating?.toDouble() ?: 5.0,
@@ -540,7 +522,7 @@ fun EmptyState(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
                 modifier = Modifier.size(100.dp),
-                shadowElevation = 4.dp
+                shadowElevation = 0.dp
             ) {}
             Icon(
                 icon, contentDescription = null,

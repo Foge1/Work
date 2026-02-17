@@ -1,5 +1,6 @@
 package com.loaderapp.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,7 +23,8 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onMenuClick: () -> Unit,
     onBackClick: () -> Unit,
-    onDarkThemeChanged: ((Boolean) -> Unit)? = null
+    onDarkThemeChanged: ((Boolean) -> Unit)? = null,
+    onSwitchRole: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val app = remember(context) { context.applicationContext as LoaderApplication }
@@ -124,7 +126,7 @@ fun SettingsScreen(
                 Column {
                     Text("Версия приложения", fontWeight = FontWeight.Medium)
                     Text(
-                        text = "GruzchikiApp v5.0",
+                        text = "GruzchikiApp 9.1",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -132,6 +134,46 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            // Блок "Аккаунт" — смена роли
+            if (onSwitchRole != null) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                SettingsSectionHeader("Аккаунт")
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSwitchRole() }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SyncAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Сменить роль", fontWeight = FontWeight.Medium)
+                        Text(
+                            text = "Переключиться между диспетчером и грузчиком",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }

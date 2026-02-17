@@ -678,7 +678,7 @@ private fun ChatBubble(
                 accentColor.copy(alpha = 0.85f)
             else
                 MaterialTheme.colorScheme.surface,
-            shadowElevation = 1.dp
+            shadowElevation = 0.dp
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 Text(
