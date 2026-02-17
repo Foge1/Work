@@ -41,6 +41,7 @@ import com.loaderapp.data.repository.AppRepository
 import com.loaderapp.notification.NotificationHelper
 import com.loaderapp.ui.theme.GoldStar
 import com.loaderapp.ui.theme.StatusOrange
+import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -65,6 +66,8 @@ fun OrderDetailScreen(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     val notificationHelper = remember { NotificationHelper(context) }
+
+    BackHandler { onBack() }
 
     // Chat state
     val messages by repository.getMessagesForOrder(order.id).collectAsState(initial = emptyList())

@@ -24,12 +24,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loaderapp.data.model.Order
@@ -41,6 +46,7 @@ import com.loaderapp.ui.loader.SkeletonCard
 import com.loaderapp.ui.rating.RatingScreen
 import com.loaderapp.ui.settings.SettingsScreen
 import com.loaderapp.ui.theme.StatusOrange
+import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -78,9 +84,18 @@ fun DispatcherScreen(
     val availableCount = orders.count { it.status == OrderStatus.AVAILABLE }
     val takenCount = orders.count { it.status == OrderStatus.TAKEN || it.status == OrderStatus.IN_PROGRESS }
 
+    BackHandler(enabled = drawerState.isOpen || isSearchActive || currentDestination != DispatcherDestination.ORDERS || selectedTab != 0) {
+        when {
+            drawerState.isOpen -> scope.launch { drawerState.close() }
+            isSearchActive -> viewModel.setSearchActive(false)
+            currentDestination != DispatcherDestination.ORDERS -> currentDestination = DispatcherDestination.ORDERS
+            selectedTab != 0 -> selectedTab = 0
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = drawerState.isOpen,
+        gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.width(240.dp),
@@ -246,6 +261,29 @@ fun OrdersContent(
     val scope = rememberCoroutineScope()
     val pullRefreshState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
 
+    val drawerNestedScroll = remember(drawerState, pagerState) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.x < 0 && drawerState?.currentValue == DrawerValue.Open) {
+                    scope.launch { drawerState?.close() }
+                    return available
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (available.x > 0 && pagerState.currentPage == 0 && drawerState?.currentValue == DrawerValue.Closed) {
+                    scope.launch { drawerState?.open() }
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                return Velocity.Zero
+            }
+        }
+    }
+
     // Синхронизация pager ↔ selectedTab
     LaunchedEffect(selectedTab) {
         if (pagerState.currentPage != selectedTab) pagerState.animateScrollToPage(selectedTab)
@@ -322,8 +360,7 @@ fun OrdersContent(
         Box(modifier = Modifier.fillMaxSize().padding(padding).pullRefresh(pullRefreshState)) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = drawerState?.let { !it.isOpen } ?: true
+                modifier = Modifier.fillMaxSize().nestedScroll(drawerNestedScroll),
             ) { page ->
                 val currentOrders = if (page == 0) availableOrders else takenOrders
                 when {
