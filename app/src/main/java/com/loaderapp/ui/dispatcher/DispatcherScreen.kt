@@ -252,21 +252,28 @@ fun OrdersContent(
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize().padding(padding)
         ) {
-            if (isLoading && !isRefreshing) {
-                LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } }
-            } else if (currentOrders.isEmpty()) {
-                val (icon, title, subtitle) = if (selectedTab == 0)
-                    Triple(Icons.Default.Inbox, if (isSearchActive && searchQuery.isNotEmpty()) "Заказы не найдены" else "Нет свободных заказов", if (isSearchActive && searchQuery.isNotEmpty()) "Попробуйте другой запрос" else "Создайте первый заказ")
-                else
-                    Triple(Icons.Default.Assignment, "Нет заказов в работе", "Свободные заказы появятся здесь")
-                EmptyState(icon = icon, title = title, subtitle = subtitle)
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    itemsIndexed(currentOrders, key = { _, it -> it.id }) { index, order ->
-                        var visible by remember { mutableStateOf(false) }
-                        LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 60L); visible = true }
-                        AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
-                            OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) })
+            when {
+                isLoading && !isRefreshing -> {
+                    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { items(4) { SkeletonCard() } }
+                }
+                currentOrders.isEmpty() -> {
+                    val icon = if (selectedTab == 0) Icons.Default.Inbox else Icons.Default.Assignment
+                    val title = if (selectedTab == 0) {
+                        if (isSearchActive && searchQuery.isNotEmpty()) "Заказы не найдены" else "Нет свободных заказов"
+                    } else "Нет заказов в работе"
+                    val subtitle = if (selectedTab == 0) {
+                        if (isSearchActive && searchQuery.isNotEmpty()) "Попробуйте другой запрос" else "Создайте первый заказ"
+                    } else "Свободные заказы появятся здесь"
+                    EmptyState(icon = icon, title = title, subtitle = subtitle)
+                }
+                else -> {
+                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        itemsIndexed(currentOrders, key = { _, it -> it.id }) { index, order ->
+                            var visible by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 60L); visible = true }
+                            AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 3 }) {
+                                OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) })
+                            }
                         }
                     }
                 }

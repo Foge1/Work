@@ -9,7 +9,6 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.loaderapp.MainActivity
-import com.loaderapp.R
 
 class NotificationHelper(private val context: Context) {
     
