@@ -88,17 +88,15 @@ class NotificationHelper(private val context: Context) {
             NotificationManagerCompat.from(context).notify(CHAT_NOTIFICATION_ID, notification)
         } catch (e: SecurityException) { /* нет разрешения */ }
     }
+
+    fun sendOrderTakenNotification(address: String, workerName: String) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
-        
         val pendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            intent,
+            context, 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Заказ принят")
@@ -107,11 +105,8 @@ class NotificationHelper(private val context: Context) {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
-        
         try {
             NotificationManagerCompat.from(context).notify(NEW_ORDER_NOTIFICATION_ID + 1, notification)
-        } catch (e: SecurityException) {
-            // Пользователь не дал разрешение на уведомления
-        }
+        } catch (e: SecurityException) { }
     }
 }
