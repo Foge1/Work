@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.LocalTextStyle
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -391,7 +391,7 @@ private fun BasicAppTextField(
         maxLines = maxLines,
         singleLine = maxLines == 1,
         keyboardOptions = keyboardOptions,
-        textStyle = LocalTextStyle.current.copy(
+        textStyle = MaterialTheme.typography.bodyLarge.copy(
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 15.sp
         ),
