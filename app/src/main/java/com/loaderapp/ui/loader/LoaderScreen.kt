@@ -650,6 +650,30 @@ fun MyOrderCard(order: Order, workerCount: Int = 0, onComplete: () -> Unit, onCl
                 if (order.requiredWorkers > 1) {
                     WorkerProgressBadge(current = workerCount, required = order.requiredWorkers, modifier = Modifier.padding(top = 4.dp))
                 }
+                // Для завершённых — дата завершения и заработок
+                if (order.status == OrderStatus.COMPLETED) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    order.completedAt?.let { completedAt ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+                            Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(14.dp))
+                            Text(
+                                " Завершён ${SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault()).format(Date(completedAt))}",
+                                fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    if (order.estimatedHours > 0) {
+                        val earned = (order.pricePerHour * order.estimatedHours).toInt()
+                        Surface(color = MaterialTheme.colorScheme.secondary.copy(0.1f), shape = RoundedCornerShape(6.dp)) {
+                            Text(
+                                "💰 Заработано ~$earned ₽",
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                }
                 order.workerRating?.let { rating ->
                     Row(modifier = Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         repeat(5) { i -> Icon(if (i < rating.toInt()) Icons.Default.Star else Icons.Default.StarBorder, null, tint = if (i < rating.toInt()) GoldStar else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.3f), modifier = Modifier.size(14.dp)) }

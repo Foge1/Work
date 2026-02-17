@@ -240,7 +240,7 @@ fun OrdersContent(
     drawerState: DrawerState? = null
 ) {
     val availableOrders = orders.filter { it.status == OrderStatus.AVAILABLE }
-    val takenOrders = orders.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.IN_PROGRESS }
+    val takenOrders = orders.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.IN_PROGRESS || it.status == OrderStatus.COMPLETED }
     val focusRequester = remember { FocusRequester() }
     val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 2 })
     val scope = rememberCoroutineScope()
@@ -409,6 +409,29 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
                 Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${order.pricePerHour.toInt()} ₽/час", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = accentColor)
                     if (order.estimatedHours > 1) Text(" · ~${order.estimatedHours} ч · ${(order.pricePerHour * order.estimatedHours).toInt()} ₽", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                // Для завершённых — дата завершения и оценка
+                if (order.status == OrderStatus.COMPLETED) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    order.completedAt?.let { completedAt ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+                            Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(14.dp))
+                            Text(" Завершён ${dateFormat.format(Date(completedAt))}", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                    order.workerRating?.let { rating ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            repeat(5) { i ->
+                                Icon(
+                                    if (i < rating.toInt()) Icons.Default.Star else Icons.Default.StarBorder,
+                                    null,
+                                    tint = if (i < rating.toInt()) com.loaderapp.ui.theme.GoldStar else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.3f),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            Text(" Оценка грузчика", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+                        }
+                    }
                 }
                 if (order.status == OrderStatus.AVAILABLE) {
                     OutlinedButton(
