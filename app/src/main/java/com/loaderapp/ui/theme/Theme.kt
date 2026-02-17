@@ -48,14 +48,6 @@ private val LightColorScheme = lightColorScheme(
     onError = Color.White
 )
 
-private val AppShapes = Shapes(
-    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(8),
-    small = androidx.compose.foundation.shape.RoundedCornerShape(12),
-    medium = androidx.compose.foundation.shape.RoundedCornerShape(16),
-    large = androidx.compose.foundation.shape.RoundedCornerShape(20),
-    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(28)
-)
-
 @Composable
 fun LoaderAppTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
@@ -68,5 +60,5 @@ fun LoaderAppTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composa
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
-    MaterialTheme(colorScheme = colorScheme, typography = Typography, shapes = AppShapes, content = content)
+    MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
 }

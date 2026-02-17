@@ -3,6 +3,7 @@ package com.loaderapp.ui.auth
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -232,12 +233,20 @@ private fun RoleCard(
     )
 
     Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth().scale(scale),
+        modifier = modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .then(
+                Modifier.clickable(
+                    indication = null,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    onClick = onClick
+                )
+            ),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(width = if (selected) 2.dp else 1.dp, color = borderColor),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 2.dp else 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(18.dp),
