@@ -76,7 +76,7 @@ fun DispatcherScreen(
     val scope = rememberCoroutineScope()
 
     val availableCount = orders.count { it.status == OrderStatus.AVAILABLE }
-    val takenCount = orders.count { it.status == OrderStatus.TAKEN || it.status == OrderStatus.COMPLETED }
+    val takenCount = orders.count { it.status == OrderStatus.TAKEN || it.status == OrderStatus.IN_PROGRESS }
 
     ModalNavigationDrawer(
         drawerState = drawerState,

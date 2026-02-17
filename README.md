@@ -1,8 +1,8 @@
-# GruzchikiApp v7.1
+# GruzchikiApp v7.2
 
 Android-приложение для управления грузчиками. Kotlin + Jetpack Compose. Бирюзовая тема.
 
-## Что нового в v7.1
+## Что нового в v7.2
 
 ### Баг-фиксы
 - ✅ **Исправлено завершение заказа у грузчика** — `loadMyOrders` теперь подписан на два Flow: `getOrdersByWorker` (реагирует на смену статуса) и `getOrderIdsByWorker` (junction-таблица для мультигрузчиков). Ранее после `completeOrder` UI не обновлялся т.к. список IDs не менялся.

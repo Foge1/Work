@@ -37,10 +37,10 @@ fun CreateOrderScreen(
     var address by remember { mutableStateOf("") }
     var cargo by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
-    var estimatedHours by remember { mutableStateOf("1") }
+    var estimatedHours by remember { mutableIntStateOf(2) }
     var comment by remember { mutableStateOf("") }
     var requiredWorkers by remember { mutableIntStateOf(1) }
-    var minWorkerRating by remember { mutableStateOf("") }
+    var minWorkerRating by remember { mutableFloatStateOf(0f) }
     var showError by remember { mutableStateOf(false) }
     var errorFields by remember { mutableStateOf(setOf<String>()) }
 
@@ -71,7 +71,8 @@ fun CreateOrderScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .imePadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
@@ -126,22 +127,62 @@ fun CreateOrderScreen(
                     placeholder = "0",
                     isError = "price" in errorFields,
                     modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    leadingText = "₽"
                 )
-                AppField(
-                    icon = Icons.Default.Timer,
-                    label = "Часов",
-                    value = estimatedHours,
-                    onValueChange = { estimatedHours = it },
-                    placeholder = "1",
+                // Степер часов 2–12
+                Column(
                     modifier = Modifier.weight(0.65f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Часов",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 6.dp, start = 2.dp).fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(0.5f), RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 4.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(
+                            onClick = { if (estimatedHours > 2) estimatedHours-- },
+                            enabled = estimatedHours > 2,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.Remove, null,
+                                tint = if (estimatedHours > 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp))
+                        }
+                        Text(
+                            text = "$estimatedHours",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        IconButton(
+                            onClick = { if (estimatedHours < 12) estimatedHours++ },
+                            enabled = estimatedHours < 12,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.Add, null,
+                                tint = if (estimatedHours < 12) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
             }
 
             // Итоговая сумма
             val priceVal = price.toDoubleOrNull() ?: 0.0
-            val hoursVal = estimatedHours.toIntOrNull() ?: 1
+            val hoursVal = estimatedHours
             if (priceVal > 0 && hoursVal > 0) {
                 Row(
                     modifier = Modifier
@@ -198,40 +239,49 @@ fun CreateOrderScreen(
 
             // --- Минимальный рейтинг ---
             SectionLabel("Минимальный рейтинг грузчика")
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Icon(Icons.Default.Star, null, tint = GoldStar, modifier = Modifier.size(22.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    val ratingDisplay = minWorkerRating.toFloatOrNull()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Star, null, tint = GoldStar, modifier = Modifier.size(20.dp))
                     Text(
-                        text = if (ratingDisplay != null) String.format("%.1f", ratingDisplay) else "Не указан",
-                        fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                        color = if (ratingDisplay != null) primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        text = if (minWorkerRating == 0f) "Без ограничений" else "от ${String.format("%.1f", minWorkerRating)}",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (minWorkerRating == 0f) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
                     )
-                    Text("Нажмите на звёзды", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                // 5 звёзд для выбора рейтинга
-                Row {
-                    for (i in 1..5) {
-                        val filled = (minWorkerRating.toFloatOrNull() ?: 0f) >= i
-                        Icon(
-                            Icons.Default.Star, null,
-                            tint = if (filled) GoldStar else MaterialTheme.colorScheme.outlineVariant,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clickable {
-                                    val current = minWorkerRating.toFloatOrNull() ?: 0f
-                                    minWorkerRating = if (current.toInt() == i) "" else i.toString()
-                                }
-                        )
+                    if (minWorkerRating > 0f) {
+                        TextButton(
+                            onClick = { minWorkerRating = 0f },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                        ) { Text("Сбросить", fontSize = 12.sp) }
                     }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Slider(
+                    value = minWorkerRating,
+                    onValueChange = { minWorkerRating = (Math.round(it * 10) / 10f) },
+                    valueRange = 0f..5f,
+                    steps = 49, // 50 шагов → 0.0, 0.1, 0.2 ... 5.0
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("0", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("5.0", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -271,8 +321,8 @@ fun CreateOrderScreen(
                     errorFields = errors
                     if (errors.isNotEmpty()) { showError = true; return@Button }
                     val p = price.toDoubleOrNull() ?: 0.0
-                    val h = estimatedHours.toIntOrNull() ?: 1
-                    val r = minWorkerRating.toFloatOrNull()?.coerceIn(0f, 5f) ?: 0f
+                    val h = estimatedHours
+                    val r = minWorkerRating.coerceIn(0f, 5f)
                     if (p <= 0 || h <= 0) { showError = true; return@Button }
                     val cal = Calendar.getInstance()
                     cal.timeInMillis = selectedDate
@@ -324,7 +374,8 @@ fun AppField(
     isError: Boolean = false,
     maxLines: Int = 1,
     modifier: Modifier = Modifier,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    leadingText: String? = null  // если задан — показывать текст вместо иконки
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val borderColor = when {
@@ -350,13 +401,23 @@ fun AppField(
                 .padding(horizontal = 12.dp, vertical = if (maxLines > 1) 10.dp else 4.dp),
             verticalAlignment = if (maxLines > 1) Alignment.Top else Alignment.CenterVertically
         ) {
-            Icon(
-                icon, null,
-                tint = if (value.isNotEmpty()) primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .size(20.dp)
-                    .padding(top = if (maxLines > 1) 4.dp else 0.dp)
-            )
+            if (leadingText != null) {
+                Text(
+                    text = leadingText,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (value.isNotEmpty()) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = if (maxLines > 1) 4.dp else 0.dp)
+                )
+            } else {
+                Icon(
+                    icon, null,
+                    tint = if (value.isNotEmpty()) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .padding(top = if (maxLines > 1) 4.dp else 0.dp)
+                )
+            }
             Spacer(Modifier.width(10.dp))
             BasicAppTextField(
                 value = value,
