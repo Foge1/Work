@@ -201,6 +201,7 @@ fun LoaderScreen(
             }
         }
     }
+}
 
     orderToTake?.let { order -> TakeOrderBottomSheet(order = order, onDismiss = { orderToTake = null }, onConfirm = { viewModel.takeOrder(order); orderToTake = null }) }
     showRatingDialog?.let { order -> RateOrderDialog(onDismiss = { showRatingDialog = null }, onRate = { rating -> viewModel.rateOrder(order.id, rating); showRatingDialog = null }) }

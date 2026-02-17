@@ -206,6 +206,7 @@ fun DispatcherScreen(
             }
         }
     }
+}
 
     if (showSwitchDialog) {
         AlertDialog(
