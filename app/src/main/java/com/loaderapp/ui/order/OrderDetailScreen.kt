@@ -31,7 +31,6 @@ import com.loaderapp.data.model.OrderStatus
 import com.loaderapp.data.model.User
 import com.loaderapp.ui.theme.GoldStar
 import com.loaderapp.ui.theme.StatusOrange
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -52,31 +51,23 @@ fun OrderDetailScreen(
     val scrollState = rememberScrollState()
 
     // Staggered entrance animations
-    val headerAlpha = remember { Animatable(0f) }
-    val headerOffset = remember { Animatable(30f) }
-    val contentAlpha = remember { Animatable(0f) }
-    val contentOffset = remember { Animatable(24f) }
-    val actionsAlpha = remember { Animatable(0f) }
-    val actionsOffset = remember { Animatable(20f) }
-
+    // Единый прогресс анимации — без coroutineScope/launch внутри LaunchedEffect
+    val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.coroutineScope {
-            kotlinx.coroutines.launch {
-                headerAlpha.animateTo(1f, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow))
-                headerOffset.animateTo(0f, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow))
-            }
-            kotlinx.coroutines.launch {
-                delay(80)
-                contentAlpha.animateTo(1f, tween(320, easing = FastOutSlowInEasing))
-                contentOffset.animateTo(0f, tween(320, easing = FastOutSlowInEasing))
-            }
-            kotlinx.coroutines.launch {
-                delay(160)
-                actionsAlpha.animateTo(1f, tween(280, easing = FastOutSlowInEasing))
-                actionsOffset.animateTo(0f, tween(280, easing = FastOutSlowInEasing))
-            }
-        }
+        progress.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
     }
+
+    fun blockAlpha(start: Float, end: Float) =
+        ((progress.value - start) / (end - start)).coerceIn(0f, 1f)
+    fun blockOffset(start: Float, end: Float, from: Float = 24f) =
+        from * (1f - ((progress.value - start) / (end - start)).coerceIn(0f, 1f))
+
+    val headerAlphaVal = blockAlpha(0f, 0.45f)
+    val headerOffsetVal = blockOffset(0f, 0.45f, 30f)
+    val contentAlphaVal = blockAlpha(0.2f, 0.72f)
+    val contentOffsetVal = blockOffset(0.2f, 0.72f, 24f)
+    val actionsAlphaVal = blockAlpha(0.42f, 0.92f)
+    val actionsOffsetVal = blockOffset(0.42f, 0.92f, 20f)
 
     val accentColor = when (order.status) {
         OrderStatus.AVAILABLE -> MaterialTheme.colorScheme.primary
@@ -110,8 +101,8 @@ fun OrderDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .alpha(headerAlpha.value)
-                    .offset(y = headerOffset.value.dp)
+                    .alpha(headerAlphaVal)
+                    .offset(y = headerOffsetVal.dp)
             ) {
                 Box(
                     modifier = Modifier
@@ -185,8 +176,8 @@ fun OrderDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .alpha(contentAlpha.value)
-                    .offset(y = contentOffset.value.dp)
+                    .alpha(contentAlphaVal)
+                    .offset(y = contentOffsetVal.dp)
             ) {
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -282,8 +273,8 @@ fun OrderDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 24.dp, bottom = 16.dp)
-                        .alpha(actionsAlpha.value)
-                        .offset(y = actionsOffset.value.dp),
+                        .alpha(actionsAlphaVal)
+                        .offset(y = actionsOffsetVal.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Грузчик: взять заказ
