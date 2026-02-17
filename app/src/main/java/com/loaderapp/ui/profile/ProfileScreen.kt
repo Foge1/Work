@@ -43,7 +43,8 @@ fun ProfileScreen(
     dispatcherCompletedCount: Int = 0,
     dispatcherActiveCount: Int = 0,
     onMenuClick: () -> Unit,
-    onSaveProfile: (name: String, phone: String, birthDate: Long?) -> Unit
+    onSaveProfile: (name: String, phone: String, birthDate: Long?) -> Unit,
+    onSwitchRole: (() -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     var isEditing by remember { mutableStateOf(false) }
@@ -240,6 +241,28 @@ fun ProfileScreen(
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Кнопка сменить роль — только если передан callback
+            if (onSwitchRole != null) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = onSwitchRole,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                ) {
+                    Icon(Icons.Default.SwitchAccount, null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Сменить роль", fontWeight = FontWeight.Medium)
                 }
             }
 

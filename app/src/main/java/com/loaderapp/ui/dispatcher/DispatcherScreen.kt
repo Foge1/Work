@@ -26,17 +26,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loaderapp.data.model.Order
@@ -80,84 +74,80 @@ fun DispatcherScreen(
     var currentDestination by remember { mutableStateOf(DispatcherDestination.ORDERS) }
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Свободные", "В работе")
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     val availableCount = orders.count { it.status == OrderStatus.AVAILABLE }
     val takenCount = orders.count { it.status == OrderStatus.TAKEN || it.status == OrderStatus.IN_PROGRESS }
 
-    BackHandler(enabled = drawerState.isOpen || isSearchActive || currentDestination != DispatcherDestination.ORDERS || selectedTab != 0) {
+    // BackHandler: закрыть поиск → вернуться на заказы → вернуться на первую вкладку
+    BackHandler(enabled = isSearchActive || currentDestination != DispatcherDestination.ORDERS || selectedTab != 0) {
         when {
-            drawerState.isOpen -> scope.launch { drawerState.close() }
             isSearchActive -> viewModel.setSearchActive(false)
             currentDestination != DispatcherDestination.ORDERS -> currentDestination = DispatcherDestination.ORDERS
             selectedTab != 0 -> selectedTab = 0
         }
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        gesturesEnabled = true,
-        drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier.width(240.dp),
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
-                drawerShape = RectangleShape
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+    val navItems = listOf(
+        Triple(DispatcherDestination.ORDERS, Icons.Default.Assignment, "Заказы"),
+        Triple(DispatcherDestination.HISTORY, Icons.Default.History, "История"),
+        Triple(DispatcherDestination.RATING, Icons.Default.Star, "Рейтинг"),
+        Triple(DispatcherDestination.PROFILE, Icons.Default.Person, "Профиль"),
+        Triple(DispatcherDestination.SETTINGS, Icons.Default.Settings, "Настройки")
+    )
+
+    // CREATE не показывает BottomBar
+    val showBottomBar = currentDestination != DispatcherDestination.CREATE
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            if (showBottomBar) {
+                NavigationBar(
+                    tonalElevation = 0.dp,
+                    containerColor = MaterialTheme.colorScheme.surface
                 ) {
-                    IconButton(onClick = { scope.launch { drawerState.close() } }) {
-                        Icon(Icons.Default.Menu, "Закрыть меню", tint = MaterialTheme.colorScheme.onSurface)
+                    navItems.forEach { (dest, icon, label) ->
+                        val selected = currentDestination == dest
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = { currentDestination = dest },
+                            icon = {
+                                BadgedBox(
+                                    badge = {
+                                        if (dest == DispatcherDestination.ORDERS && availableCount > 0) {
+                                            Badge { Text("$availableCount") }
+                                        }
+                                    }
+                                ) {
+                                    Icon(icon, contentDescription = label)
+                                }
+                            },
+                            label = { Text(label, fontSize = 11.sp) },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        )
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Column {
-                        Text(userName, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text("Диспетчер", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    // Сменить роль — последний пункт
+                    NavigationBarItem(
+                        selected = false,
+                        onClick = { showSwitchDialog = true },
+                        icon = { Icon(Icons.Default.SyncAlt, contentDescription = "Сменить роль") },
+                        label = { Text("Роль", fontSize = 11.sp) }
+                    )
                 }
-                HorizontalDivider()
-                val primary = MaterialTheme.colorScheme.primary
-
-                @Composable
-                fun DrawerItem(label: String, selected: Boolean, badge: Int = 0, onClick: () -> Unit) {
-                    val textColor = if (selected) primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(48.dp).background(
-                            if (selected) Brush.horizontalGradient(listOf(primary.copy(0.15f), Color.Transparent))
-                            else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
-                        ), verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(primary.copy(if (selected) 1f else 0f)))
-                        Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent, onClick = onClick) {
-                            Row(modifier = Modifier.fillMaxSize().padding(start = 20.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(label, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = textColor)
-                                if (badge > 0) Badge(containerColor = primary) { Text("$badge", fontSize = 11.sp, color = Color.White) }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                DrawerItem("Заказы", currentDestination == DispatcherDestination.ORDERS, badge = availableCount) { currentDestination = DispatcherDestination.ORDERS; scope.launch { drawerState.close() } }
-                DrawerItem("Профиль", currentDestination == DispatcherDestination.PROFILE) { currentDestination = DispatcherDestination.PROFILE; scope.launch { drawerState.close() } }
-                DrawerItem("Рейтинг", currentDestination == DispatcherDestination.RATING) { currentDestination = DispatcherDestination.RATING; scope.launch { drawerState.close() } }
-                DrawerItem("История", currentDestination == DispatcherDestination.HISTORY) { currentDestination = DispatcherDestination.HISTORY; scope.launch { drawerState.close() } }
-                DrawerItem("Настройки", currentDestination == DispatcherDestination.SETTINGS) { currentDestination = DispatcherDestination.SETTINGS; scope.launch { drawerState.close() } }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                DrawerItem("Сменить роль", false) { showSwitchDialog = true; scope.launch { drawerState.close() } }
             }
         }
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            AnimatedContent(
+    ) { paddingValues ->
+        AnimatedContent(
             targetState = currentDestination,
             transitionSpec = {
                 fadeIn(tween(220)) + slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it / 10 } togetherWith
-                fadeOut(tween(160))
+                        fadeOut(tween(160))
             },
-            label = "dispatcher_nav"
+            label = "dispatcher_nav",
+            modifier = Modifier.padding(paddingValues)
         ) { destination ->
             when (destination) {
                 DispatcherDestination.ORDERS -> OrdersContent(
@@ -167,7 +157,6 @@ fun DispatcherScreen(
                     completedCount = completedCount,
                     searchQuery = searchQuery, isSearchActive = isSearchActive,
                     onTabSelected = { selectedTab = it },
-                    onMenuClick = { scope.launch { drawerState.open() } },
                     onCreateOrder = { currentDestination = DispatcherDestination.CREATE },
                     onCancelOrder = { viewModel.cancelOrder(it) },
                     onSearchQueryChange = { viewModel.setSearchQuery(it) },
@@ -180,8 +169,7 @@ fun DispatcherScreen(
                         }
                     },
                     onRefresh = { viewModel.refresh() },
-                    workerCounts = workerCounts,
-                    drawerState = drawerState
+                    workerCounts = workerCounts
                 )
                 DispatcherDestination.CREATE -> CreateOrderScreen(
                     onBack = { currentDestination = DispatcherDestination.ORDERS },
@@ -191,19 +179,19 @@ fun DispatcherScreen(
                     }
                 )
                 DispatcherDestination.SETTINGS -> SettingsScreen(
-                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onMenuClick = { /* нет drawer */ },
                     onBackClick = { currentDestination = DispatcherDestination.ORDERS },
                     onDarkThemeChanged = onDarkThemeChanged
                 )
                 DispatcherDestination.RATING -> RatingScreen(
                     userName = userName, userRating = 5.0,
-                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onMenuClick = { /* нет drawer */ },
                     onBackClick = { currentDestination = DispatcherDestination.ORDERS },
                     dispatcherCompletedCount = completedCount, dispatcherActiveCount = activeCount, isDispatcher = true
                 )
                 DispatcherDestination.HISTORY -> HistoryScreen(
                     orders = orders,
-                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onMenuClick = { /* нет drawer */ },
                     onBackClick = { currentDestination = DispatcherDestination.ORDERS }
                 )
                 DispatcherDestination.PROFILE -> {
@@ -215,7 +203,7 @@ fun DispatcherScreen(
                             user = user,
                             dispatcherCompletedCount = completedCnt,
                             dispatcherActiveCount = activeCnt,
-                            onMenuClick = { scope.launch { drawerState.open() } },
+                            onMenuClick = { /* нет drawer */ },
                             onSaveProfile = { name, phone, birthDate -> viewModel.saveProfile(name, phone, birthDate) }
                         )
                     }
@@ -223,7 +211,6 @@ fun DispatcherScreen(
             }
         }
     }
-}
 
     if (showSwitchDialog) {
         AlertDialog(
@@ -250,11 +237,10 @@ fun OrdersContent(
     selectedTab: Int, tabs: List<String>, availableCount: Int, takenCount: Int,
     completedCount: Int = 0,
     searchQuery: String, isSearchActive: Boolean, onTabSelected: (Int) -> Unit,
-    onMenuClick: () -> Unit, onCreateOrder: () -> Unit, onCancelOrder: (Order) -> Unit,
+    onCreateOrder: () -> Unit, onCancelOrder: (Order) -> Unit,
     onSearchQueryChange: (String) -> Unit, onSearchToggle: (Boolean) -> Unit,
     onOrderClick: (Order) -> Unit, onRefresh: () -> Unit,
-    workerCounts: Map<Long, Int> = emptyMap(),
-    drawerState: DrawerState? = null
+    workerCounts: Map<Long, Int> = emptyMap()
 ) {
     val availableOrders = orders.filter { it.status == OrderStatus.AVAILABLE }
     val takenOrders = orders.filter { it.status == OrderStatus.TAKEN || it.status == OrderStatus.IN_PROGRESS || it.status == OrderStatus.COMPLETED }
@@ -262,29 +248,6 @@ fun OrdersContent(
     val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 2 })
     val scope = rememberCoroutineScope()
     val pullRefreshState = rememberPullRefreshState(refreshing = isRefreshing, onRefresh = onRefresh)
-
-    val drawerNestedScroll = remember(drawerState, pagerState) {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.x < 0 && drawerState?.currentValue == DrawerValue.Open) {
-                    scope.launch { drawerState?.close() }
-                    return available
-                }
-                return Offset.Zero
-            }
-
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (available.x > 0 && pagerState.currentPage == 0 && drawerState?.currentValue == DrawerValue.Closed) {
-                    scope.launch { drawerState?.open() }
-                }
-                return Offset.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                return Velocity.Zero
-            }
-        }
-    }
 
     // Синхронизация pager ↔ selectedTab
     LaunchedEffect(selectedTab) {
@@ -304,7 +267,10 @@ fun OrdersContent(
                                 value = searchQuery, onValueChange = onSearchQueryChange,
                                 placeholder = { Text("Поиск заказов...") }, singleLine = true,
                                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent)
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent
+                                )
                             )
                             LaunchedEffect(Unit) { focusRequester.requestFocus() }
                         } else {
@@ -316,23 +282,24 @@ fun OrdersContent(
                     },
                     navigationIcon = {
                         if (isSearchActive) {
-                            IconButton(onClick = { onSearchToggle(false) }) { Icon(Icons.Default.ArrowBack, "Назад") }
-                        } else {
-                            Box {
-                                IconButton(onClick = onMenuClick) { Icon(Icons.Default.Menu, "Меню") }
-                                if (availableCount > 0) Badge(
-                                    modifier = Modifier.align(Alignment.TopEnd).offset(x = (-4).dp, y = 4.dp),
-                                    containerColor = MaterialTheme.colorScheme.primary
-                                ) { Text("$availableCount", fontSize = 9.sp, color = Color.White) }
+                            IconButton(onClick = { onSearchToggle(false) }) {
+                                Icon(Icons.Default.ArrowBack, "Назад")
                             }
                         }
                     },
                     actions = {
-                        if (!isSearchActive) IconButton(onClick = { onSearchToggle(true) }) { Icon(Icons.Default.Search, "Поиск") }
-                        else if (searchQuery.isNotEmpty()) IconButton(onClick = { onSearchQueryChange("") }) { Icon(Icons.Default.Clear, "Очистить") }
+                        if (!isSearchActive) {
+                            IconButton(onClick = { onSearchToggle(true) }) {
+                                Icon(Icons.Default.Search, "Поиск")
+                            }
+                        } else if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { onSearchQueryChange("") }) {
+                                Icon(Icons.Default.Clear, "Очистить")
+                            }
+                        }
                     }
                 )
-                // Pill-style tabs
+                // Pill-style вкладки
                 val pillPrimary = MaterialTheme.colorScheme.primary
                 val pillSurface = MaterialTheme.colorScheme.surfaceVariant
                 Row(
@@ -360,7 +327,10 @@ fun OrdersContent(
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Text(
                                     label,
                                     fontSize = 14.sp,
@@ -400,17 +370,24 @@ fun OrdersContent(
         Box(modifier = Modifier.fillMaxSize().padding(padding).pullRefresh(pullRefreshState)) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize().nestedScroll(drawerNestedScroll),
+                modifier = Modifier.fillMaxSize()
             ) { page ->
                 val currentOrders = if (page == 0) availableOrders else takenOrders
                 when {
-                    isLoading && !isRefreshing -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    isLoading && !isRefreshing -> LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         items(4) { SkeletonCard() }
                     }
                     currentOrders.isEmpty() -> {
                         val icon = if (page == 0) Icons.Default.Inbox else Icons.Default.Assignment
-                        val title = if (page == 0) { if (isSearchActive && searchQuery.isNotEmpty()) "Заказы не найдены" else "Нет свободных заказов" } else "Нет заказов в работе"
-                        val subtitle = if (page == 0) { if (isSearchActive && searchQuery.isNotEmpty()) "Попробуйте другой запрос" else "Создайте первый заказ" } else "Свободные заказы появятся здесь"
+                        val title = if (page == 0) {
+                            if (isSearchActive && searchQuery.isNotEmpty()) "Заказы не найдены" else "Нет свободных заказов"
+                        } else "Нет заказов в работе"
+                        val subtitle = if (page == 0) {
+                            if (isSearchActive && searchQuery.isNotEmpty()) "Попробуйте другой запрос" else "Создайте первый заказ"
+                        } else "Свободные заказы появятся здесь"
                         EmptyState(icon = icon, title = title, subtitle = subtitle)
                     }
                     else -> LazyColumn(
@@ -421,8 +398,16 @@ fun OrdersContent(
                         itemsIndexed(currentOrders, key = { _, it -> it.id }) { index, order ->
                             var visible by remember { mutableStateOf(false) }
                             LaunchedEffect(Unit) { kotlinx.coroutines.delay(index.toLong() * 50L); visible = true }
-                            AnimatedVisibility(visible, enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 4 }) {
-                                OrderCard(order = order, onCancel = { onCancelOrder(it) }, onClick = { onOrderClick(order) }, workerCount = workerCounts[order.id] ?: 0)
+                            AnimatedVisibility(
+                                visible,
+                                enter = fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 4 }
+                            ) {
+                                OrderCard(
+                                    order = order,
+                                    onCancel = { onCancelOrder(it) },
+                                    onClick = { onOrderClick(order) },
+                                    workerCount = workerCounts[order.id] ?: 0
+                                )
                             }
                         }
                     }
@@ -466,6 +451,9 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         elevation = CardDefaults.cardElevation(0.dp),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -477,43 +465,113 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
                     )
             )
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(order.address, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        order.address, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
                     StatusChip(order.status)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        dateFormat.format(Date(order.dateTime)), fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Text("·", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f))
-                    Text(timeAgo(order.createdAt), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
+                    Text(
+                        timeAgo(order.createdAt), fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f)
+                    )
                 }
-                Text(order.cargoDescription, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
-                if (order.comment.isNotBlank()) Text("💬 ${order.comment}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+                Text(
+                    order.cargoDescription, fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+                if (order.comment.isNotBlank()) {
+                    Text(
+                        "💬 ${order.comment}", fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
                 if (order.requiredWorkers > 1 || order.minWorkerRating > 0f) {
-                    Row(modifier = Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         if (order.requiredWorkers > 1) {
-                            com.loaderapp.ui.loader.WorkerProgressBadge(current = workerCount, required = order.requiredWorkers)
+                            com.loaderapp.ui.loader.WorkerProgressBadge(
+                                current = workerCount, required = order.requiredWorkers
+                            )
                         }
                         if (order.minWorkerRating > 0f) {
-                            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.extraSmall) {
-                                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Star, null, tint = com.loaderapp.ui.theme.GoldStar, modifier = Modifier.size(12.dp))
-                                    Text(" от ${order.minWorkerRating}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = MaterialTheme.shapes.extraSmall
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Star, null,
+                                        tint = com.loaderapp.ui.theme.GoldStar,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        " от ${order.minWorkerRating}", fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }
                     }
                 }
-                Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${order.pricePerHour.toInt()} ₽/час", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = accentColor)
-                    if (order.estimatedHours > 1) Text(" · ~${order.estimatedHours} ч · ${(order.pricePerHour * order.estimatedHours).toInt()} ₽", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    modifier = Modifier.padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${order.pricePerHour.toInt()} ₽/час", fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold, color = accentColor
+                    )
+                    if (order.estimatedHours > 1) {
+                        Text(
+                            " · ~${order.estimatedHours} ч · ${(order.pricePerHour * order.estimatedHours).toInt()} ₽",
+                            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 if (order.status == OrderStatus.COMPLETED) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
                     order.completedAt?.let { completedAt ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
-                            Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(14.dp))
-                            Text(" Завершён ${dateFormat.format(Date(completedAt))}", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Medium)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle, null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                " Завершён ${dateFormat.format(Date(completedAt))}",
+                                fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
                     order.workerRating?.let { rating ->
@@ -522,38 +580,48 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
                                 Icon(
                                     if (i < rating.toInt()) Icons.Default.Star else Icons.Default.StarBorder,
                                     null,
-                                    tint = if (i < rating.toInt()) com.loaderapp.ui.theme.GoldStar else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.3f),
+                                    tint = if (i < rating.toInt()) com.loaderapp.ui.theme.GoldStar
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(0.3f),
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
-                            Text(" Оценка грузчика", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+                            Text(
+                                " Оценка грузчика", fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
                         }
                     }
                 }
                 if (order.status == OrderStatus.AVAILABLE) {
                     OutlinedButton(
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCancelConfirm = true },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showCancelConfirm = true
+                        },
                         modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
                         shape = MaterialTheme.shapes.small,
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.error),
-                        border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.error)
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.5.dp, MaterialTheme.colorScheme.error
+                        )
                     ) { Text("Отменить", fontWeight = FontWeight.Medium) }
                 }
             }
         }
     }
 
-    // Диалог подтверждения отмены
     if (showCancelConfirm) {
         AlertDialog(
             onDismissRequest = { showCancelConfirm = false },
             shape = MaterialTheme.shapes.extraLarge,
             icon = {
                 Icon(
-                    Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(28.dp)
+                    Icons.Default.Warning, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(28.dp)
                 )
             },
             title = { Text("Отменить заказ?", fontWeight = FontWeight.SemiBold) },
@@ -587,6 +655,10 @@ fun StatusChip(status: OrderStatus) {
         OrderStatus.CANCELLED -> "Отменён" to MaterialTheme.colorScheme.error
     }
     Surface(color = color.copy(0.12f), shape = RoundedCornerShape(6.dp)) {
-        Text(text, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color
+        )
     }
 }
