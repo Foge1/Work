@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -330,31 +332,69 @@ fun OrdersContent(
                         else if (searchQuery.isNotEmpty()) IconButton(onClick = { onSearchQueryChange("") }) { Icon(Icons.Default.Clear, "Очистить") }
                     }
                 )
-                TabRow(selectedTabIndex = pagerState.currentPage) {
-                    Tab(selected = pagerState.currentPage == 0, onClick = { scope.launch { pagerState.animateScrollToPage(0) } }, text = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Свободные")
-                            if (availableCount > 0) Badge(containerColor = MaterialTheme.colorScheme.primary) { Text("$availableCount", fontSize = 10.sp, color = Color.White) }
-                        }
-                    })
-                    Tab(selected = pagerState.currentPage == 1, onClick = { scope.launch { pagerState.animateScrollToPage(1) } }, text = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("В работе")
-                            if (takenCount > 0 || completedCount > 0) Badge(containerColor = StatusOrange) {
-                                Text("$takenCount/$completedCount", fontSize = 10.sp, color = Color.White)
+                // Pill-style tabs
+                val pillPrimary = MaterialTheme.colorScheme.primary
+                val pillSurface = MaterialTheme.colorScheme.surfaceVariant
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .background(pillSurface, RoundedCornerShape(50))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(
+                        "Свободные" to (if (availableCount > 0) "$availableCount" else null),
+                        "В работе" to (if (takenCount > 0 || completedCount > 0) "$takenCount/$completedCount" else null)
+                    ).forEachIndexed { index, (label, badge) ->
+                        val selected = pagerState.currentPage == index
+                        val badgeColor = if (index == 0) pillPrimary else StatusOrange
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                                    RoundedCornerShape(50)
+                                )
+                                .clickable { scope.launch { pagerState.animateScrollToPage(index) } }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    label,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (selected) pillPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (badge != null) {
+                                    Badge(containerColor = badgeColor) {
+                                        Text(badge, fontSize = 10.sp, color = Color.White)
+                                    }
+                                }
                             }
                         }
-                    })
+                    }
                 }
             }
         },
         floatingActionButton = {
+            val listState = rememberLazyListState()
+            val fabVisible by remember {
+                derivedStateOf { listState.firstVisibleItemIndex == 0 || listState.firstVisibleItemScrollOffset == 0 }
+            }
             val haptic = LocalHapticFeedback.current
-            ExtendedFloatingActionButton(
-                onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onCreateOrder() },
-                icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("Создать заказ") }
-            )
+            AnimatedVisibility(
+                visible = fabVisible,
+                enter = fadeIn() + slideInVertically { it },
+                exit = fadeOut() + slideOutVertically { it }
+            ) {
+                ExtendedFloatingActionButton(
+                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onCreateOrder() },
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text("Создать заказ") }
+                )
+            }
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding).pullRefresh(pullRefreshState)) {
@@ -398,6 +438,21 @@ fun OrdersContent(
 }
 
 @Composable
+fun timeAgo(timestamp: Long): String {
+    val diff = System.currentTimeMillis() - timestamp
+    val minutes = diff / 60_000
+    val hours = diff / 3_600_000
+    val days = diff / 86_400_000
+    return when {
+        minutes < 1 -> "только что"
+        minutes < 60 -> "$minutes мин. назад"
+        hours < 24 -> "$hours ч. назад"
+        days < 7 -> "$days д. назад"
+        else -> SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(timestamp))
+    }
+}
+
+@Composable
 fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {}, workerCount: Int = 0) {
     val haptic = LocalHapticFeedback.current
     val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
@@ -413,15 +468,29 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
         elevation = CardDefaults.cardElevation(2.dp),
         shape = MaterialTheme.shapes.medium
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accentColor))
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Gradient overlay сверху по цвету статуса
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(accentColor.copy(alpha = 0.10f), Color.Transparent)
+                        )
+                    )
+            )
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(order.address, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     StatusChip(order.status)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("·", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f))
+                    Text(timeAgo(order.createdAt), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
+                }
                 Text(order.cargoDescription, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
                 if (order.comment.isNotBlank()) Text("💬 ${order.comment}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
                 if (order.requiredWorkers > 1 || order.minWorkerRating > 0f) {
@@ -443,7 +512,6 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
                     Text("${order.pricePerHour.toInt()} ₽/час", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = accentColor)
                     if (order.estimatedHours > 1) Text(" · ~${order.estimatedHours} ч · ${(order.pricePerHour * order.estimatedHours).toInt()} ₽", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                // Для завершённых — дата завершения и оценка
                 if (order.status == OrderStatus.COMPLETED) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     order.completedAt?.let { completedAt ->

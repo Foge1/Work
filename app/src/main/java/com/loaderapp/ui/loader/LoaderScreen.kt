@@ -379,21 +379,49 @@ fun LoaderOrdersContent(
                         }
                     }
                 )
-                TabRow(selectedTabIndex = pagerState.currentPage) {
-                    Tab(selected = pagerState.currentPage == 0, onClick = { scope.launch { pagerState.animateScrollToPage(0) } }, text = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Доступные")
-                            if (availableOrders.isNotEmpty()) Badge(containerColor = MaterialTheme.colorScheme.primary) { Text("${availableOrders.size}", fontSize = 10.sp, color = Color.White) }
-                        }
-                    })
-                    Tab(selected = pagerState.currentPage == 1, onClick = { scope.launch { pagerState.animateScrollToPage(1) } }, text = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Мои заказы")
-                            if (activeOrderCount > 0 || completedCount > 0) Badge(containerColor = StatusOrange) {
-                                Text("$activeOrderCount/$completedCount", fontSize = 10.sp, color = Color.White)
+                // Pill-style tabs
+                val pillPrimary = MaterialTheme.colorScheme.primary
+                val pillSurface = MaterialTheme.colorScheme.surfaceVariant
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .background(pillSurface, RoundedCornerShape(50))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(
+                        "Доступные" to (if (availableOrders.isNotEmpty()) "${availableOrders.size}" else null),
+                        "Мои заказы" to (if (activeOrderCount > 0 || completedCount > 0) "$activeOrderCount/$completedCount" else null)
+                    ).forEachIndexed { index, (label, badge) ->
+                        val selected = pagerState.currentPage == index
+                        val badgeColor = if (index == 0) pillPrimary else StatusOrange
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                                    RoundedCornerShape(50)
+                                )
+                                .clickable { scope.launch { pagerState.animateScrollToPage(index) } }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    label,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (selected) pillPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (badge != null) {
+                                    Badge(containerColor = badgeColor) {
+                                        Text(badge, fontSize = 10.sp, color = Color.White)
+                                    }
+                                }
                             }
                         }
-                    })
+                    }
                 }
             }
         }
@@ -615,19 +643,26 @@ fun AvailableOrderCard(order: Order, workerCount: Int = 0, onTake: () -> Unit, o
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accentColor))
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .background(Brush.verticalGradient(listOf(accentColor.copy(alpha = 0.10f), Color.Transparent)))
+            )
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)) {
                 Text(order.address, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("·", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f))
+                    Text(com.loaderapp.ui.dispatcher.timeAgo(order.createdAt), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
+                }
                 Text(order.cargoDescription, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
                 if (order.comment.isNotBlank()) Text("💬 ${order.comment}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
                 if (order.requiredWorkers > 1 || order.minWorkerRating > 0f) {
                     Row(modifier = Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (order.requiredWorkers > 1) {
-                            WorkerProgressBadge(current = workerCount, required = order.requiredWorkers)
-                        }
+                        if (order.requiredWorkers > 1) WorkerProgressBadge(current = workerCount, required = order.requiredWorkers)
                         if (order.minWorkerRating > 0f) {
                             Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
                                 Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -665,15 +700,24 @@ fun MyOrderCard(order: Order, workerCount: Int = 0, onComplete: () -> Unit, onCl
         OrderStatus.CANCELLED -> MaterialTheme.colorScheme.error
     }
     Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, elevation = CardDefaults.cardElevation(2.dp), shape = MaterialTheme.shapes.medium) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.width(4.dp).fillMaxHeight().background(accentColor))
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .background(Brush.verticalGradient(listOf(accentColor.copy(alpha = 0.10f), Color.Transparent)))
+            )
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(order.address, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     LoaderStatusChip(order.status)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(dateFormat.format(Date(order.dateTime)), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("·", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.5f))
+                    Text(com.loaderapp.ui.dispatcher.timeAgo(order.createdAt), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
+                }
                 Text(order.cargoDescription, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
                 Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${order.pricePerHour.toInt()} ₽/час", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = accentColor)
@@ -682,7 +726,6 @@ fun MyOrderCard(order: Order, workerCount: Int = 0, onComplete: () -> Unit, onCl
                 if (order.requiredWorkers > 1) {
                     WorkerProgressBadge(current = workerCount, required = order.requiredWorkers, modifier = Modifier.padding(top = 4.dp))
                 }
-                // Для завершённых — дата завершения и заработок
                 if (order.status == OrderStatus.COMPLETED) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     order.completedAt?.let { completedAt ->
