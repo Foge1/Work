@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loaderapp.ui.theme.GoldStar
@@ -34,6 +36,7 @@ fun CreateOrderScreen(
     onCreate: (address: String, dateTime: Long, cargo: String, price: Double,
                hours: Int, comment: String, requiredWorkers: Int, minRating: Float) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     var address by remember { mutableStateOf("") }
     var cargo by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
@@ -324,6 +327,7 @@ fun CreateOrderScreen(
                     val h = estimatedHours
                     val r = minWorkerRating.coerceIn(0f, 5f)
                     if (p <= 0 || h <= 0) { showError = true; return@Button }
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     val cal = Calendar.getInstance()
                     cal.timeInMillis = selectedDate
                     cal.set(Calendar.HOUR_OF_DAY, selectedHour)

@@ -27,7 +27,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -62,6 +66,8 @@ fun OrderDetailScreen(
     workerCount: Int = 0
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val clipboard = LocalClipboardManager.current
     val dateFormat = SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale("ru"))
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
@@ -203,12 +209,34 @@ fun OrderDetailScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        Text(
-                            text = order.address,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            lineHeight = 28.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = order.address,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                lineHeight = 28.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            var addressCopied by remember { mutableStateOf(false) }
+                            IconButton(
+                                onClick = {
+                                    clipboard.setText(AnnotatedString(order.address))
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    addressCopied = true
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    if (addressCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                                    contentDescription = "Скопировать адрес",
+                                    tint = if (addressCopied) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(10.dp))
 
@@ -539,7 +567,10 @@ fun OrderDetailScreen(
                 ) {
                     if (!isDispatcher && order.status == OrderStatus.AVAILABLE && onTakeOrder != null) {
                         Button(
-                            onClick = { onTakeOrder(order) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onTakeOrder(order)
+                            },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
                             shape = RoundedCornerShape(14.dp)
                         ) {
@@ -551,7 +582,10 @@ fun OrderDetailScreen(
 
                     if (!isDispatcher && order.status == OrderStatus.TAKEN && onCompleteOrder != null) {
                         Button(
-                            onClick = { onCompleteOrder(order) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onCompleteOrder(order)
+                            },
                             modifier = Modifier.fillMaxWidth().height(54.dp),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -566,7 +600,10 @@ fun OrderDetailScreen(
 
                     if (isDispatcher && order.status == OrderStatus.AVAILABLE && onCancelOrder != null) {
                         OutlinedButton(
-                            onClick = { onCancelOrder(order) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onCancelOrder(order)
+                            },
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
