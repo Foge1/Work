@@ -28,6 +28,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -80,7 +83,7 @@ fun DispatcherScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = true,
+        gesturesEnabled = false,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.width(240.dp),
@@ -133,7 +136,8 @@ fun DispatcherScreen(
             }
         }
     ) {
-        AnimatedContent(
+        Box(modifier = Modifier.fillMaxSize()) {
+            AnimatedContent(
             targetState = currentDestination,
             transitionSpec = {
                 fadeIn(tween(220)) + slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it / 10 } togetherWith
@@ -202,6 +206,21 @@ fun DispatcherScreen(
                     }
                 }
             }
+
+            // Невидимая зона по левому краю для свайпа открытия drawer
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(20.dp)
+                    .align(Alignment.CenterStart)
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures { _, dragAmount ->
+                            if (dragAmount > 10f) {
+                                scope.launch { drawerState.open() }
+                            }
+                        }
+                    }
+            )
         }
     }
 

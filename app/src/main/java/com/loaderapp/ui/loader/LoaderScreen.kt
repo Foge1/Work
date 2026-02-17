@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -84,7 +86,7 @@ fun LoaderScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = true,
+        gesturesEnabled = false,
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -143,7 +145,8 @@ fun LoaderScreen(
             }
         }
     ) {
-        AnimatedContent(
+        Box(modifier = Modifier.fillMaxSize()) {
+            AnimatedContent(
             targetState = currentDestination,
             transitionSpec = {
                 fadeIn(tween(220)) + slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it / 10 } togetherWith
@@ -197,6 +200,22 @@ fun LoaderScreen(
                     )
                 }
             }
+        }
+
+            // Невидимая зона по левому краю для свайпа открытия drawer
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(20.dp)
+                    .align(Alignment.CenterStart)
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures { _, dragAmount ->
+                            if (dragAmount > 10f) {
+                                scope.launch { drawerState.open() }
+                            }
+                        }
+                    }
+            )
         }
     }
 
