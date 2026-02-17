@@ -41,12 +41,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        setContent { MainScreen(onRequestNotificationPermission = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
-        }
-        setContent { MainScreen() }
+        }) }
     }
 }
 
@@ -70,7 +71,7 @@ private sealed class AppScreen {
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(onRequestNotificationPermission: () -> Unit = {}) {
     val context = LocalContext.current
     val app = remember(context) { context.applicationContext as LoaderApplication }
     var currentUser by remember { mutableStateOf<User?>(null) }
@@ -140,6 +141,7 @@ fun MainScreen() {
             ) { s ->
                 when (s) {
                     is AppScreen.Splash -> SplashScreen(onFinished = {
+                        onRequestNotificationPermission()
                         val dest = if (currentUser != null) {
                             when (currentUser!!.role) {
                                 UserRole.DISPATCHER -> { screenKey = "dispatcher"; AppScreen.Dispatcher(currentUser!!) }

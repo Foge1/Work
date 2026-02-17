@@ -80,6 +80,7 @@ fun DispatcherScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.width(240.dp),
@@ -145,6 +146,7 @@ fun DispatcherScreen(
                     orders = orders, isLoading = isLoading, isRefreshing = isRefreshing,
                     userName = userName, selectedTab = selectedTab, tabs = tabs,
                     availableCount = availableCount, takenCount = takenCount,
+                    completedCount = completedCount,
                     searchQuery = searchQuery, isSearchActive = isSearchActive,
                     onTabSelected = { selectedTab = it },
                     onMenuClick = { scope.launch { drawerState.open() } },
@@ -226,6 +228,7 @@ fun DispatcherScreen(
 fun OrdersContent(
     orders: List<Order>, isLoading: Boolean, isRefreshing: Boolean, userName: String,
     selectedTab: Int, tabs: List<String>, availableCount: Int, takenCount: Int,
+    completedCount: Int = 0,
     searchQuery: String, isSearchActive: Boolean, onTabSelected: (Int) -> Unit,
     onMenuClick: () -> Unit, onCreateOrder: () -> Unit, onCancelOrder: (Order) -> Unit,
     onSearchQueryChange: (String) -> Unit, onSearchToggle: (Boolean) -> Unit,
@@ -295,7 +298,9 @@ fun OrdersContent(
                     Tab(selected = pagerState.currentPage == 1, onClick = { scope.launch { pagerState.animateScrollToPage(1) } }, text = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("В работе")
-                            if (takenCount > 0) Badge(containerColor = StatusOrange) { Text("$takenCount", fontSize = 10.sp, color = Color.White) }
+                            if (takenCount > 0 || completedCount > 0) Badge(containerColor = StatusOrange) {
+                                Text("$takenCount/$completedCount", fontSize = 10.sp, color = Color.White)
+                            }
                         }
                     })
                 }

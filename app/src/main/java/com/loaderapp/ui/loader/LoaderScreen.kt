@@ -84,6 +84,7 @@ fun LoaderScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = true,
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
@@ -155,6 +156,7 @@ fun LoaderScreen(
                     availableOrders = availableOrders, myOrders = myOrders,
                     isLoading = isLoading, isRefreshing = isRefreshing, userName = userName,
                     selectedTab = selectedTab, activeOrder = activeOrder,
+                    completedCount = completedCount,
                     onTabSelected = { selectedTab = it },
                     onMenuClick = { scope.launch { drawerState.open() } },
                     onTakeOrder = { orderToTake = it },
@@ -301,6 +303,7 @@ fun RateOrderDialog(onDismiss: () -> Unit, onRate: (Float) -> Unit) {
 fun LoaderOrdersContent(
     availableOrders: List<Order>, myOrders: List<Order>, isLoading: Boolean, isRefreshing: Boolean,
     userName: String, selectedTab: Int, activeOrder: Order?, onTabSelected: (Int) -> Unit,
+    completedCount: Int = 0,
     onMenuClick: () -> Unit, onTakeOrder: (Order) -> Unit, onCompleteOrder: (Order) -> Unit,
     onOrderClick: (Order) -> Unit, onRefresh: () -> Unit,
     workerCounts: Map<Long, Int> = emptyMap()
@@ -342,7 +345,9 @@ fun LoaderOrdersContent(
                     Tab(selected = pagerState.currentPage == 1, onClick = { scope.launch { pagerState.animateScrollToPage(1) } }, text = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Мои заказы")
-                            if (activeOrderCount > 0) Badge(containerColor = StatusOrange) { Text("$activeOrderCount", fontSize = 10.sp, color = Color.White) }
+                            if (activeOrderCount > 0 || completedCount > 0) Badge(containerColor = StatusOrange) {
+                                Text("$activeOrderCount/$completedCount", fontSize = 10.sp, color = Color.White)
+                            }
                         }
                     })
                 }
