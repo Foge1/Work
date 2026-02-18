@@ -301,7 +301,7 @@ fun OrdersContent(
                             modifier = Modifier
                                 .weight(1f)
                                 .background(
-                                    if (selected) MaterialTheme.colorScheme.background else Color.Transparent,
+                                    if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                     RoundedCornerShape(50)
                                 )
                                 .clickable { scope.launch { pagerState.animateScrollToPage(index) } }

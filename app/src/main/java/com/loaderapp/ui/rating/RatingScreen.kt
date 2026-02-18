@@ -252,7 +252,7 @@ fun StatCard(
 
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(0.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(

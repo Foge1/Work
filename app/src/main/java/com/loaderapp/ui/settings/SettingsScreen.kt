@@ -126,7 +126,7 @@ fun SettingsScreen(
                 Column {
                     Text("Версия приложения", fontWeight = FontWeight.Medium)
                     Text(
-                        text = "GruzchikiApp 9.1",
+                        text = "GruzchikiApp 9.2",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

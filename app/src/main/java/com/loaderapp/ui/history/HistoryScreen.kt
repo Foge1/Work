@@ -150,7 +150,7 @@ fun HistoryOrderCard(order: Order) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(0.dp),
         shape = MaterialTheme.shapes.small
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {

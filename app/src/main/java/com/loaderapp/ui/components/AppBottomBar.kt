@@ -3,7 +3,6 @@ package com.loaderapp.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -27,7 +26,6 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,10 +33,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -48,6 +51,37 @@ data class BottomNavItem(
     val badgeCount: Int = 0
 )
 
+fun Modifier.coloredShadow(
+    color: Color,
+    borderRadius: Dp = 24.dp,
+    blurRadius: Dp = 24.dp,
+    offsetY: Dp = (-6).dp
+) = this.drawBehind {
+    drawIntoCanvas { canvas ->
+        val paint = Paint().apply {
+            asFrameworkPaint().apply {
+                isAntiAlias = true
+                this.color = android.graphics.Color.TRANSPARENT
+                setShadowLayer(
+                    blurRadius.toPx(),
+                    0f,
+                    offsetY.toPx(),
+                    color.copy(alpha = 0.18f).toArgb()
+                )
+            }
+        }
+        canvas.drawRoundRect(
+            left = 0f,
+            top = 0f,
+            right = size.width,
+            bottom = size.height,
+            radiusX = borderRadius.toPx(),
+            radiusY = borderRadius.toPx(),
+            paint = paint
+        )
+    }
+}
+
 @Composable
 fun AppBottomBar(
     items: List<BottomNavItem>,
@@ -55,39 +89,30 @@ fun AppBottomBar(
     onItemSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
+    val shadowColor = MaterialTheme.colorScheme.onSurface
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .coloredShadow(color = shadowColor)
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
-        // Тонкая линия-разделитель сверху
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                    )
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                items.forEachIndexed { index, item ->
-                    val isSelected = index == selectedIndex
-                    AppBottomBarItem(
-                        item = item,
-                        isSelected = isSelected,
-                        onClick = { onItemSelected(index) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEachIndexed { index, item ->
+                AppBottomBarItem(
+                    item = item,
+                    isSelected = index == selectedIndex,
+                    onClick = { onItemSelected(index) },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
@@ -103,29 +128,26 @@ private fun AppBottomBarItem(
     val interactionSource = remember { MutableInteractionSource() }
 
     val iconScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.12f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "iconScale"
-    )
-
-    val pillWidth by animateDpAsState(
-        targetValue = if (isSelected) 52.dp else 0.dp,
-        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-        label = "pillWidth"
+        targetValue = if (isSelected) 1.1f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "scale"
     )
 
     val iconColor by animateColorAsState(
         targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-        animationSpec = tween(200),
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "iconColor"
     )
 
-    val labelColor by animateColorAsState(
+    val textColor by animateColorAsState(
         targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-        else Color.Transparent,
-        animationSpec = tween(180),
-        label = "labelColor"
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
+        label = "textColor"
     )
 
     Column(
@@ -139,19 +161,17 @@ private fun AppBottomBarItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Pill-индикатор + иконка
-        Box(contentAlignment = Alignment.Center) {
-            // Фоновая pill-капсула
-            Box(
-                modifier = Modifier
-                    .size(width = pillWidth, height = 32.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                        else Color.Transparent
-                    )
-            )
-            // Иконка с бейджем
+        // Бирюзовая капсула только вокруг иконки
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(
+                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
+                    else Color.Transparent
+                )
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+        ) {
             BadgedBox(
                 badge = {
                     if (item.badgeCount > 0) {
@@ -174,15 +194,13 @@ private fun AppBottomBarItem(
             }
         }
 
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(3.dp))
 
-        // Подпись — всегда видна, но цвет меняется
         Text(
             text = item.label,
             fontSize = 10.sp,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isSelected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+            color = textColor,
             maxLines = 1
         )
     }
