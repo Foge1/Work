@@ -376,7 +376,8 @@ fun LoaderOrdersContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .background(pillSurface, RoundedCornerShape(50))
+                        .clip(RoundedCornerShape(50))
+                        .background(pillSurface)
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -389,9 +390,9 @@ fun LoaderOrdersContent(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
+                                .clip(RoundedCornerShape(50))
                                 .background(
-                                    if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                    RoundedCornerShape(50)
+                                    if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                 )
                                 .clickable { scope.launch { pagerState.animateScrollToPage(index) } }
                                 .padding(vertical = 8.dp),
@@ -595,7 +596,7 @@ fun ActiveOrderBanner(order: Order, workerCount: Int = 0, onComplete: () -> Unit
                         color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 14.sp
                     )
                 }
-                Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary.copy(0.15f)) {
+                Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary.copy(0.15f), shadowElevation = 0.dp) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -675,7 +676,7 @@ fun AvailableOrderCard(order: Order, workerCount: Int = 0, onTake: () -> Unit, o
                     Row(modifier = Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (order.requiredWorkers > 1) WorkerProgressBadge(current = workerCount, required = order.requiredWorkers)
                         if (order.minWorkerRating > 0f) {
-                            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp)) {
+                            Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp), shadowElevation = 0.dp) {
                                 Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Star, null, tint = GoldStar, modifier = Modifier.size(12.dp))
                                     Text(" от ${order.minWorkerRating}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -769,7 +770,7 @@ fun MyOrderCard(order: Order, workerCount: Int = 0, onComplete: () -> Unit, onCl
                     }
                     if (order.estimatedHours > 0) {
                         val earned = (order.pricePerHour * order.estimatedHours).toInt()
-                        Surface(color = MaterialTheme.colorScheme.secondary.copy(0.1f), shape = RoundedCornerShape(6.dp)) {
+                        Surface(color = MaterialTheme.colorScheme.secondary.copy(0.1f), shape = RoundedCornerShape(6.dp), shadowElevation = 0.dp) {
                             Text(
                                 "💰 Заработано ~$earned ₽",
                                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
@@ -805,7 +806,7 @@ fun LoaderStatusChip(status: OrderStatus) {
         OrderStatus.COMPLETED -> "Завершён" to MaterialTheme.colorScheme.secondary
         OrderStatus.CANCELLED -> "Отменён" to MaterialTheme.colorScheme.error
     }
-    Surface(color = color.copy(0.12f), shape = RoundedCornerShape(6.dp)) {
+    Surface(color = color.copy(0.12f), shape = RoundedCornerShape(6.dp), shadowElevation = 0.dp) {
         Text(
             text, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color

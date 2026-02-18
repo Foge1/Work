@@ -9,39 +9,18 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -51,37 +30,6 @@ data class BottomNavItem(
     val badgeCount: Int = 0
 )
 
-fun Modifier.coloredShadow(
-    color: Color,
-    borderRadius: Dp = 24.dp,
-    blurRadius: Dp = 24.dp,
-    offsetY: Dp = (-6).dp
-) = this.drawBehind {
-    drawIntoCanvas { canvas ->
-        val paint = Paint().apply {
-            asFrameworkPaint().apply {
-                isAntiAlias = true
-                this.color = android.graphics.Color.TRANSPARENT
-                setShadowLayer(
-                    blurRadius.toPx(),
-                    0f,
-                    offsetY.toPx(),
-                    color.copy(alpha = 0.18f).toArgb()
-                )
-            }
-        }
-        canvas.drawRoundRect(
-            left = 0f,
-            top = 0f,
-            right = size.width,
-            bottom = size.height,
-            radiusX = borderRadius.toPx(),
-            radiusY = borderRadius.toPx(),
-            paint = paint
-        )
-    }
-}
-
 @Composable
 fun AppBottomBar(
     items: List<BottomNavItem>,
@@ -89,22 +37,20 @@ fun AppBottomBar(
     onItemSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shadowColor = MaterialTheme.colorScheme.onSurface
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .coloredShadow(color = shadowColor)
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .windowInsetsPadding(WindowInsets.navigationBars)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shadowElevation = 16.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             items.forEachIndexed { index, item ->
                 AppBottomBarItem(
@@ -127,8 +73,8 @@ private fun AppBottomBarItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
-    val iconScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.1f else 1f,
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.08f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
@@ -138,14 +84,14 @@ private fun AppBottomBarItem(
 
     val iconColor by animateColorAsState(
         targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
         animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "iconColor"
     )
 
     val textColor by animateColorAsState(
         targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
         animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "textColor"
     )
@@ -159,38 +105,60 @@ private fun AppBottomBarItem(
             )
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
-        // Бирюзовая капсула только вокруг иконки
+        // Тонкая бирюзовая линия-индикатор сверху (как на референсе)
+        Box(
+            modifier = Modifier
+                .width(24.dp)
+                .height(2.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(
+                    if (isSelected) MaterialTheme.colorScheme.primary
+                    else Color.Transparent
+                )
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Компактная капсула только вокруг иконки
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
+                .scale(scale)
                 .clip(RoundedCornerShape(50))
                 .background(
-                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
+                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
                     else Color.Transparent
                 )
-                .padding(horizontal = 14.dp, vertical = 6.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
-            BadgedBox(
-                badge = {
-                    if (item.badgeCount > 0) {
-                        Badge {
-                            Text(
-                                text = if (item.badgeCount > 99) "99+" else "${item.badgeCount}",
-                                fontSize = 9.sp
-                            )
-                        }
-                    }
-                },
-                modifier = Modifier.scale(iconScale)
-            ) {
+            Box {
                 Icon(
                     imageVector = item.icon,
                     contentDescription = item.label,
                     tint = iconColor,
                     modifier = Modifier.size(22.dp)
                 )
+                if (item.badgeCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 5.dp, y = (-3).dp)
+                            .size(15.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.error),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (item.badgeCount > 99) "99+" else "${item.badgeCount}",
+                            fontSize = 8.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 8.sp
+                        )
+                    }
+                }
             }
         }
 

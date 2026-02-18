@@ -287,7 +287,8 @@ fun OrdersContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .background(pillSurface, RoundedCornerShape(50))
+                        .clip(RoundedCornerShape(50))
+                        .background(pillSurface)
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -300,9 +301,9 @@ fun OrdersContent(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
+                                .clip(RoundedCornerShape(50))
                                 .background(
-                                    if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                    RoundedCornerShape(50)
+                                    if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                 )
                                 .clickable { scope.launch { pagerState.animateScrollToPage(index) } }
                                 .padding(vertical = 8.dp),
@@ -635,7 +636,7 @@ fun StatusChip(status: OrderStatus) {
         OrderStatus.COMPLETED -> "Завершён" to MaterialTheme.colorScheme.secondary
         OrderStatus.CANCELLED -> "Отменён" to MaterialTheme.colorScheme.error
     }
-    Surface(color = color.copy(0.12f), shape = RoundedCornerShape(6.dp)) {
+    Surface(color = color.copy(0.12f), shape = RoundedCornerShape(6.dp), shadowElevation = 0.dp) {
         Text(
             text,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
