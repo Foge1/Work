@@ -228,6 +228,7 @@ fun TakeOrderBottomSheet(order: Order, onDismiss: () -> Unit, onConfirm: () -> U
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp),
+                shadowElevation = 0.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -549,6 +550,7 @@ fun WorkerProgressBadge(current: Int, required: Int, modifier: Modifier = Modifi
         color = if (isFull) MaterialTheme.colorScheme.primary.copy(0.12f)
         else StatusOrange.copy(0.12f),
         shape = RoundedCornerShape(6.dp),
+        shadowElevation = 0.dp,
         modifier = modifier
     ) {
         Row(

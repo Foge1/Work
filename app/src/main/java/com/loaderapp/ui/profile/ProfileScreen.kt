@@ -100,7 +100,6 @@ fun ProfileScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 80.dp)
         ) {
             // Шапка профиля с градиентом
             Box(
@@ -132,7 +131,7 @@ fun ProfileScreen(
                     Text(text = user.name, fontSize = 22.sp, fontWeight = FontWeight.Bold)
 
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Surface(shape = RoundedCornerShape(20.dp), color = primary.copy(alpha = 0.12f)) {
+                        Surface(shape = RoundedCornerShape(20.dp), color = primary.copy(alpha = 0.12f), shadowElevation = 0.dp) {
                             Text(
                                 text = if (isLoader) "Грузчик" else "Диспетчер",
                                 fontSize = 13.sp,
@@ -142,7 +141,7 @@ fun ProfileScreen(
                             )
                         }
                         if (age != null) {
-                            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceVariant, shadowElevation = 0.dp) {
                                 Text(
                                     text = "$age лет",
                                     fontSize = 13.sp,
@@ -268,6 +267,7 @@ fun ProfileScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 

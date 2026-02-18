@@ -81,7 +81,7 @@ fun HistoryScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Summary header
@@ -228,6 +228,7 @@ fun HistoryStatusChip(status: OrderStatus) {
     Surface(
         color = color.copy(alpha = 0.12f),
         shape = RoundedCornerShape(4.dp)
+    shadowElevation = 0.dp,
     ) {
         Text(
             text = text,

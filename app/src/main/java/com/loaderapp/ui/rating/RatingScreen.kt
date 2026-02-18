@@ -57,7 +57,6 @@ fun RatingScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 80.dp)
         ) {
             // Header with gradient
             Box(
@@ -232,6 +231,7 @@ fun RatingScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }
