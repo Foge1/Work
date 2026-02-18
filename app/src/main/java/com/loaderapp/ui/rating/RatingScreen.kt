@@ -56,8 +56,8 @@ fun RatingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(bottom = 80.dp)
                 .verticalScroll(rememberScrollState())
+                .padding(bottom = 80.dp)
         ) {
             // Header with gradient
             Box(

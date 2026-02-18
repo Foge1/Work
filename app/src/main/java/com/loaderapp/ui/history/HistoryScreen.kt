@@ -53,7 +53,7 @@ fun HistoryScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 96.dp),
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -81,7 +81,7 @@ fun HistoryScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Summary header

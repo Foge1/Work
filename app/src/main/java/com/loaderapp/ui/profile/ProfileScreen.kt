@@ -99,8 +99,8 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(bottom = 80.dp)
                 .verticalScroll(rememberScrollState())
+                .padding(bottom = 80.dp)
         ) {
             // Шапка профиля с градиентом
             Box(
@@ -327,6 +327,7 @@ private fun ProfileInfoRow(icon: ImageVector, label: String, value: String) {
 @Composable
 private fun MiniStatCard(modifier: Modifier, value: String, label: String, icon: ImageVector, color: Color) {
     Card(modifier = modifier, elevation = CardDefaults.cardElevation(0.dp), shape = RoundedCornerShape(12.dp)) {
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         Column(modifier = Modifier.padding(14.dp)) {
             Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.height(6.dp))
