@@ -99,6 +99,7 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .padding(bottom = 80.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             // Шапка профиля с градиентом

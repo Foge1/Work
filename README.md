@@ -1,4 +1,4 @@
-# GruzchikiApp 9.4
+# GruzchikiApp 9.6
 
 Android-приложение для управления грузчиками. Kotlin + Jetpack Compose. Бирюзовая тема.
 

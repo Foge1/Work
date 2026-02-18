@@ -51,6 +51,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .padding(bottom = 80.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -126,7 +127,7 @@ fun SettingsScreen(
                 Column {
                     Text("Версия приложения", fontWeight = FontWeight.Medium)
                     Text(
-                        text = "GruzchikiApp 9.4",
+                        text = "GruzchikiApp 9.6",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

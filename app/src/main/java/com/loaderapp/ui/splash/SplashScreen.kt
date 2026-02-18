@@ -96,7 +96,7 @@ fun SplashScreen(onFinished: () -> Unit) {
             LoadingDots(modifier = Modifier.alpha(dotsAlpha.value))
         }
 
-        Text(text = "9.4", fontSize = 12.sp, color = Color.White.copy(alpha = 0.3f), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp).alpha(textAlpha.value))
+        Text(text = "9.6", fontSize = 12.sp, color = Color.White.copy(alpha = 0.3f), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp).alpha(textAlpha.value))
     }
 }
 

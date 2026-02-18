@@ -56,6 +56,7 @@ fun RatingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .padding(bottom = 80.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             // Header with gradient
@@ -253,6 +254,7 @@ fun StatCard(
     Card(
         modifier = modifier,
         elevation = CardDefaults.cardElevation(0.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(

@@ -433,6 +433,7 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         elevation = CardDefaults.cardElevation(0.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = MaterialTheme.shapes.medium
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
