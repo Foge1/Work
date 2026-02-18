@@ -186,8 +186,8 @@ fun OrderDetailScreen(
                     Column {
                         Surface(
                             color = accentColor.copy(alpha = 0.14f),
-                            shape = RoundedCornerShape(8.dp)
-                        shadowElevation = 0.dp,
+                            shape = RoundedCornerShape(8.dp),
+                            shadowElevation = 0.dp
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -414,8 +414,8 @@ fun OrderDetailScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
                                     shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                shadowElevation = 0.dp,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                    shadowElevation = 0.dp
                                 ) {
                                     Text(
                                         text = "${messages.size}",
@@ -649,8 +649,8 @@ private fun ChatBubble(
                 Surface(
                     shape = CircleShape,
                     color = accentColor.copy(alpha = 0.15f),
-                    modifier = Modifier.size(18.dp)
-                shadowElevation = 0.dp,
+                    modifier = Modifier.size(18.dp),
+                    shadowElevation = 0.dp
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
@@ -681,7 +681,7 @@ private fun ChatBubble(
                 accentColor.copy(alpha = 0.85f)
             else
                 MaterialTheme.colorScheme.surface,
-            shadowElevation = 0.dp
+                shadowElevation = 0.dp
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 Text(
@@ -749,8 +749,8 @@ private fun DetailRow(
         Surface(
             shape = RoundedCornerShape(8.dp),
             color = color.copy(alpha = 0.12f),
-            modifier = Modifier.size(32.dp)
-        shadowElevation = 0.dp,
+            modifier = Modifier.size(32.dp),
+            shadowElevation = 0.dp
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
@@ -793,8 +793,8 @@ private fun ContactRow(
         Surface(
             shape = CircleShape,
             color = color.copy(alpha = 0.15f),
-            modifier = Modifier.size(46.dp)
-        shadowElevation = 0.dp,
+            modifier = Modifier.size(46.dp),
+            shadowElevation = 0.dp
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
@@ -814,8 +814,8 @@ private fun ContactRow(
                 Text(text = name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = color.copy(alpha = 0.12f)
-                shadowElevation = 0.dp,
+                    color = color.copy(alpha = 0.12f),
+                    shadowElevation = 0.dp
                 ) {
                     Text(
                         text = role,

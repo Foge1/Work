@@ -500,8 +500,8 @@ fun OrderCard(order: Order, onCancel: (Order) -> Unit, onClick: () -> Unit = {},
                         if (order.minWorkerRating > 0f) {
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceVariant,
-                                shape = MaterialTheme.shapes.extraSmall
-                            shadowElevation = 0.dp,
+                                shape = MaterialTheme.shapes.extraSmall,
+                                shadowElevation = 0.dp
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),

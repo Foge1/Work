@@ -227,8 +227,8 @@ fun HistoryStatusChip(status: OrderStatus) {
     }
     Surface(
         color = color.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(4.dp)
-    shadowElevation = 0.dp,
+        shape = RoundedCornerShape(4.dp),
+        shadowElevation = 0.dp
     ) {
         Text(
             text = text,
