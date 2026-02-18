@@ -173,7 +173,6 @@ private fun RoleCard(
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            shadowElevation = 0.dp,
             Surface(shape = RoundedCornerShape(12.dp), color = if (selected) primary.copy(0.12f) else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.size(48.dp), shadowElevation = 0.dp) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(icon, null, tint = iconTint, modifier = Modifier.size(26.dp))
